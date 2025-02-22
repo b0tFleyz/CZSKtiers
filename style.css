@@ -109,6 +109,9 @@ section {
     nav ul li a img {
         max-width: 20px;
     }
+    .tabulka {
+        max-width: 20px;
+    }
 }
 
 
