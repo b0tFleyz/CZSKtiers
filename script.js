@@ -198,9 +198,9 @@ document.addEventListener('DOMContentLoaded', async function () {
 
                 case "24": novyText = "LT2"; barvaTextu = "black"; barvaPozadi = "gray"; break;
 
-                case "48": novyText = "LT1"; barvaTextu = "black"; barvaPozadi = "#FFFF00"; break;
+                case "48": novyText = "LT1"; barvaTextu = "black"; barvaPozadi = "#C3C62F"; break;
 
-                case "60": novyText = "HT1"; barvaTextu = "black"; barvaPozadi = "#FFFFE0"; break;
+                case "60": novyText = "HT1"; barvaTextu = "black"; barvaPozadi = "#FFFF00"; break;
 
                 case "22": novyText = "RTL2"; barvaTextu = "dimgray"; break;
 
