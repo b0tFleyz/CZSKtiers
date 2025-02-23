@@ -1,0 +1,293 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;700&display=swap');
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #444343;
+    margin: 10px;
+    color: #333;
+}
+
+header {
+    background: linear-gradient(135deg, #1a0000, #fd7301);
+    padding: 10px 15px;
+    margin-bottom: 30px;
+    border-radius: 15px;
+    text-align: center;
+    color: #fffefe;
+}
+
+h1 {
+    display: inline;
+}
+
+nav ul {
+    list-style: none;
+    padding: 0;
+    font-size: 20px;
+    background: #333;
+    text-align: center;
+    border-radius: 15px;
+    padding: 1%;
+}
+
+nav ul li a {
+    font-weight: bold;
+    color: white;
+    text-decoration: none;
+    padding: 12px 20px;
+    background-color: #555;
+    border-radius: 25px;
+    transition: background-color 0.3s, box-shadow 0.3s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+nav ul li a:hover {
+    background-color: #666;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+}
+
+nav ul li a img {
+    max-width: 25px;
+    transition: transform 0.3s;
+}
+
+nav ul li a:hover img {
+    transform: scale(1.2);
+}
+
+section {
+    padding: 2rem;
+    text-align: center;
+}
+
+#kit {
+    max-width: 25px;
+}
+
+#konec {
+    color: white;
+}
+
+#mctiers {
+    text-align: center;
+    color: lightblue;
+}
+
+@media (min-width: 769px) {
+    nav ul li {
+        display: inline;
+        margin: 0 10px;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        margin: 10px;
+    }
+
+    nav ul {
+        font-size: 18px;
+        display: block;
+        text-align: center;
+    }
+
+    nav ul li {
+        display: block;
+        margin: 15px 0;
+    }
+
+    nav ul li a {
+        display: inline-flex;
+        padding: 12px 20px;
+    }
+
+    nav ul li a img {
+        max-width: 20px;
+    }
+}
+
+
+.tabulka {
+    display: none;
+    margin: 20px auto;
+    border-collapse: collapse;
+    border-radius: 30px;
+    border: 35px solid #333;
+    overflow: hidden;
+    width: 75%;
+}
+
+.tabulka {
+    background-color: rgb(56, 54, 54);
+}
+
+.tabulka.active {
+    display: block;
+}
+
+.tabulka th,
+.tabulka td {
+    border: none;
+    padding: 10px;
+    padding-left: 20px;
+    padding-right: 20px;
+    text-align: center;
+    font-size: 25px;
+    font-family: 'Poppins', sans-serif;
+    color: white;
+}
+
+.tabulka td:nth-child(1) {
+    font-size: 40px;
+}
+
+.tabulka td:nth-child(2) {
+    display: flex;
+}
+
+/* Styly pro ranky (společné pro všechny tabulky) */
+tbody tr:nth-child(2) td:first-child,
+tbody tr:nth-child(2) td:nth-child(2) {
+    background-color: #eecd14;
+}
+
+tbody tr:nth-child(3) td:first-child,
+tbody tr:nth-child(3) td:nth-child(2) {
+    background-color: #c0c0c0;
+}
+
+tbody tr:nth-child(4) td:first-child,
+tbody tr:nth-child(4) td:nth-child(2) {
+    background-color: #cd7f32;
+}
+
+
+#overall-tabulka td:nth-child(4) {
+    background-color: #141212;
+}
+
+#cpvp-tabulka,
+#axe-tabulka,
+#sword-tabulka,
+#npot-tabulka,
+#pot-tabulka,
+#smp-tabulka,
+#uhc-tabulka,
+#diasmp-tabulka {
+    background-color: rgba(27, 27, 105, 0.459);
+}
+
+#cpvp-tabulka tr:nth-child(2) td:nth-child(3),
+#axe-tabulka tr:nth-child(2) td:nth-child(3),
+#sword-tabulka tr:nth-child(2) td:nth-child(3),
+#npot-tabulka tr:nth-child(2) td:nth-child(3),
+#pot-tabulka tr:nth-child(2) td:nth-child(3),
+#smp-tabulka tr:nth-child(2) td:nth-child(3),
+#uhc-tabulka tr:nth-child(2) td:nth-child(3),
+#diasmp-tabulka tr:nth-child(2) td:nth-child(3) {
+    background-color: #eecd14cc;
+}
+
+#cpvp-tabulka tr:nth-child(2) td:nth-child(4),
+#axe-tabulka tr:nth-child(2) td:nth-child(4),
+#sword-tabulka tr:nth-child(2) td:nth-child(4),
+#npot-tabulka tr:nth-child(2) td:nth-child(4),
+#pot-tabulka tr:nth-child(2) td:nth-child(4),
+#smp-tabulka tr:nth-child(2) td:nth-child(4),
+#uhc-tabulka tr:nth-child(2) td:nth-child(4),
+#diasmp-tabulka tr:nth-child(2) td:nth-child(4) {
+    background-color: #c0c0c0b9;
+}
+
+#cpvp-tabulka tr:nth-child(2) td:nth-child(5),
+#axe-tabulka tr:nth-child(2) td:nth-child(5),
+#sword-tabulka tr:nth-child(2) td:nth-child(5),
+#npot-tabulka tr:nth-child(2) td:nth-child(5),
+#pot-tabulka tr:nth-child(2) td:nth-child(5),
+#smp-tabulka tr:nth-child(2) td:nth-child(5),
+#uhc-tabulka tr:nth-child(2) td:nth-child(5),
+#diasmp-tabulka tr:nth-child(2) td:nth-child(5) {
+    background-color: #cd8032b4;
+}
+
+#cpvp-tabulka tr:nth-child(2) td:nth-child(6),
+#axe-tabulka tr:nth-child(2) td:nth-child(6),
+#sword-tabulka tr:nth-child(2) td:nth-child(6),
+#npot-tabulka tr:nth-child(2) td:nth-child(6),
+#pot-tabulka tr:nth-child(2) td:nth-child(6),
+#smp-tabulka tr:nth-child(2) td:nth-child(6),
+#uhc-tabulka tr:nth-child(2) td:nth-child(6),
+#diasmp-tabulka tr:nth-child(2) td:nth-child(6),
+#cpvp-tabulka tr:nth-child(2) td:nth-child(7),
+#axe-tabulka tr:nth-child(2) td:nth-child(7),
+#sword-tabulka tr:nth-child(2) td:nth-child(7),
+#npot-tabulka tr:nth-child(2) td:nth-child(7),
+#pot-tabulka tr:nth-child(2) td:nth-child(7),
+#smp-tabulka tr:nth-child(2) td:nth-child(7),
+#uhc-tabulka tr:nth-child(2) td:nth-child(7),
+#diasmp-tabulka tr:nth-child(2) td:nth-child(7) {
+    background: #535353;
+}
+
+
+#cpvp-tabulka tr:nth-child(n+4) td:nth-child(3),
+#axe-tabulka tr:nth-child(n+4) td:nth-child(3),
+#sword-tabulka tr:nth-child(n+4) td:nth-child(3),
+#npot-tabulka tr:nth-child(n+4) td:nth-child(3),
+#pot-tabulka tr:nth-child(n+4) td:nth-child(3),
+#smp-tabulka tr:nth-child(n+4) td:nth-child(3),
+#uhc-tabulka tr:nth-child(n+4) td:nth-child(3),
+#diasmp-tabulka tr:nth-child(n+4) td:nth-child(3) {
+    background-color: rgba(253, 253, 253, 0);
+}
+
+@media (max-width: 768px) {
+    .tabulka {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .tabulka tr {
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    .tabulka td {
+        box-sizing: border-box;
+        padding: 5px;
+        font-size: 14px;
+        flex: 1 0 auto;
+        display: table-cell;
+    }
+
+    .tabulka tr>td:nth-child(-n+4) {
+        flex: 1;
+    }
+
+    #kontejner-6-14 {
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    #kontejner-6-14 td {
+        width: auto;
+        box-sizing: border-box;
+        padding: 5px;
+        font-size: 14px;
+    }
+
+    .tabulka tr>td:nth-child(n+5):nth-child(-n+13) {
+        order: 1;
+        width: 100%;
+        display: table-cell;
+    }
+
+    .tabulka tr>td:nth-child(-n+4) {
+        order: 0;
+    }
+}
