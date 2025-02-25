@@ -11,10 +11,30 @@ document.addEventListener('DOMContentLoaded', async function () {
             let table = document.getElementById(idTabulky);
             table.innerHTML = html;
 
-            table.querySelector('tr:first-child').style.display = 'none';
+            table.querySelector('tr:first-child').remove();
 
-            const rows = table.querySelectorAll('tbody tr');
+            const rows = Array.from(table.querySelectorAll('tbody tr'));
             const newImageUrl = "https://cdn.discordapp.com/emojis/1266555790953676841.webp?size=96";
+
+            rows.sort((a, b) => {
+                const aValue = parseInt(a.querySelector('td:nth-child(4)').textContent, 10);
+                const bValue = parseInt(b.querySelector('td:nth-child(4)').textContent, 10);
+                return bValue - aValue;
+            });
+
+            let currentRank = 1;
+            let previousValue = null;
+            rows.forEach((row, index) => {
+                const value = parseInt(row.querySelector('td:nth-child(4)').textContent, 10);
+                if (value !== previousValue) {
+                    currentRank = index + 1;
+                    previousValue = value;
+                }
+                const rankCell = row.querySelector('td:nth-child(1)');
+                if (rankCell) {
+                    rankCell.textContent = currentRank;
+                }
+            });
 
             rows.forEach(row => {
                 if (idTabulky !== 'overall-tabulka') {
@@ -51,19 +71,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                             combinedCell = document.createElement('td');
                             row.appendChild(combinedCell);
                         }
-
-                        const currentNumberCell = row.querySelector('td:nth-child(5)');
-                        const currentNumber = currentNumberCell ? currentNumberCell.textContent : '';
-
-                        const newImgElement = document.createElement('img');
-                        newImgElement.src = newImageUrl;
-                        newImgElement.alt = "End Crystal";
-                        newImgElement.style.width = '0px';
-                        newImgElement.style.height = '0px';
-
-                        combinedCell.innerHTML = '';
-                        combinedCell.appendChild(document.createTextNode(currentNumber + ' '));
-                        combinedCell.appendChild(newImgElement);
                     }
                 }
             });

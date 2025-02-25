@@ -88,13 +88,13 @@ section {
         margin: 1px;
     }
     header{
-        width: 96%;
+        width: 94%;
     }
     nav ul {
         font-size: 18px;
         display: block;
         text-align: center;
-        width: 100%;
+        width: 97%;
     }
 
     nav ul li {
@@ -113,8 +113,8 @@ section {
 
     .tabulka {
         display: block;
-        width: 80%;
         overflow-x: auto;
+        max-width: 88%;;
     }
 
     .tabulka tr {
@@ -168,37 +168,35 @@ section {
     .tabulka tr>td:nth-child(-n+4) {
         order: 0;
     }
-    .tabulka {
-        max-width: 85%;;
-    }
 }
 
 .table-container {
     overflow-x: auto;
     width: 100%;
+    margin: 20px 0;
 }
 
 .tabulka {
-    min-width: 77%;
+    width: 100%;
     border-collapse: collapse;
     display: none;
     margin: 20px auto;
-    border-collapse: collapse;
     border-radius: 30px;
     border: 35px solid #333;
     overflow: hidden;
-    width: 75%;
+    width: 59.6%;
     background-color: rgb(56, 54, 54);
 }
 
 .tabulka th, .tabulka td {
     border: 1px solid #ddd;
-    padding: 8px;
+    padding: calc(4px + (8 - 4) * ((100vw - 320px) / (1600 - 320)));
+    text-align: center;
+    font-size: calc(10px + (14 - 10) * ((100vw - 320px) / (1600 - 320)));
 }
 
 .tabulka th {
     background-color: #f2f2f2;
-    text-align: left;
 }
 
 .tabulka.active {
@@ -208,17 +206,14 @@ section {
 .tabulka th,
 .tabulka td {
     border: none;
-    padding: 10px;
-    padding-left: 20px;
-    padding-right: 20px;
-    text-align: center;
-    font-size: 25px;
+    padding-left: calc(10px + (15 - 10) * ((100vw - 320px) / (1600 - 320)));
+    padding-right: calc(10px + (15 - 10) * ((100vw - 320px) / (1600 - 320)));
     font-family: 'Poppins', sans-serif;
     color: white;
 }
 
 .tabulka td:nth-child(1) {
-    font-size: 40px;
+    font-size: calc(16px + (20 - 16) * ((100vw - 320px) / (1600 - 320)));
 }
 
 .tabulka td:nth-child(2) {
@@ -229,86 +224,74 @@ section {
     min-width: 50px;
 }
 
+tbody tr:nth-child(1) td:first-child,
+tbody tr:nth-child(1) td:nth-child(2) {
+    background-color: #eecd14;
+}
+
 tbody tr:nth-child(2) td:first-child,
 tbody tr:nth-child(2) td:nth-child(2) {
-    background-color: #eecd14;
+    background-color: #c0c0c0;
 }
 
 tbody tr:nth-child(3) td:first-child,
 tbody tr:nth-child(3) td:nth-child(2) {
-    background-color: #c0c0c0;
-}
-
-tbody tr:nth-child(4) td:first-child,
-tbody tr:nth-child(4) td:nth-child(2) {
     background-color: #cd7f32;
 }
-
 
 #overall-tabulka td:nth-child(4) {
     background-color: #141212;
 }
 
-#cpvp-tabulka,
-#axe-tabulka,
-#sword-tabulka,
-#npot-tabulka,
-#pot-tabulka,
-#smp-tabulka,
-#uhc-tabulka,
-#diasmp-tabulka {
-    background-color: rgba(27, 27, 105, 0.459);
-}
-
-#cpvp-tabulka tr:nth-child(2) td:nth-child(3),
-#axe-tabulka tr:nth-child(2) td:nth-child(3),
-#sword-tabulka tr:nth-child(2) td:nth-child(3),
-#npot-tabulka tr:nth-child(2) td:nth-child(3),
-#pot-tabulka tr:nth-child(2) td:nth-child(3),
-#smp-tabulka tr:nth-child(2) td:nth-child(3),
-#uhc-tabulka tr:nth-child(2) td:nth-child(3),
-#diasmp-tabulka tr:nth-child(2) td:nth-child(3) {
+#cpvp-tabulka tr:nth-child(1) td:nth-child(3),
+#axe-tabulka tr:nth-child(1) td:nth-child(3),
+#sword-tabulka tr:nth-child(1) td:nth-child(3),
+#npot-tabulka tr:nth-child(1) td:nth-child(3),
+#pot-tabulka tr:nth-child(1) td:nth-child(3),
+#smp-tabulka tr:nth-child(1) td:nth-child(3),
+#uhc-tabulka tr:nth-child(1) td:nth-child(3),
+#diasmp-tabulka tr:nth-child(1) td:nth-child(3) {
     background-color: #eecd14cc;
 }
 
-#cpvp-tabulka tr:nth-child(2) td:nth-child(4),
-#axe-tabulka tr:nth-child(2) td:nth-child(4),
-#sword-tabulka tr:nth-child(2) td:nth-child(4),
-#npot-tabulka tr:nth-child(2) td:nth-child(4),
-#pot-tabulka tr:nth-child(2) td:nth-child(4),
-#smp-tabulka tr:nth-child(2) td:nth-child(4),
-#uhc-tabulka tr:nth-child(2) td:nth-child(4),
-#diasmp-tabulka tr:nth-child(2) td:nth-child(4) {
+#cpvp-tabulka tr:nth-child(1) td:nth-child(4),
+#axe-tabulka tr:nth-child(1) td:nth-child(4),
+#sword-tabulka tr:nth-child(1) td:nth-child(4),
+#npot-tabulka tr:nth-child(1) td:nth-child(4),
+#pot-tabulka tr:nth-child(1) td:nth-child(4),
+#smp-tabulka tr:nth-child(1) td:nth-child(4),
+#uhc-tabulka tr:nth-child(1) td:nth-child(4),
+#diasmp-tabulka tr:nth-child(1) td:nth-child(4) {
     background-color: #c0c0c0b9;
 }
 
-#cpvp-tabulka tr:nth-child(2) td:nth-child(5),
-#axe-tabulka tr:nth-child(2) td:nth-child(5),
-#sword-tabulka tr:nth-child(2) td:nth-child(5),
-#npot-tabulka tr:nth-child(2) td:nth-child(5),
-#pot-tabulka tr:nth-child(2) td:nth-child(5),
-#smp-tabulka tr:nth-child(2) td:nth-child(5),
-#uhc-tabulka tr:nth-child(2) td:nth-child(5),
-#diasmp-tabulka tr:nth-child(2) td:nth-child(5) {
+#cpvp-tabulka tr:nth-child(1) td:nth-child(5),
+#axe-tabulka tr:nth-child(1) td:nth-child(5),
+#sword-tabulka tr:nth-child(1) td:nth-child(5),
+#npot-tabulka tr:nth-child(1) td:nth-child(5),
+#pot-tabulka tr:nth-child(1) td:nth-child(5),
+#smp-tabulka tr:nth-child(1) td:nth-child(5),
+#uhc-tabulka tr:nth-child(1) td:nth-child(5),
+#diasmp-tabulka tr:nth-child(1) td:nth-child(5) {
     background-color: #cd8032b4;
 }
 
-#cpvp-tabulka tr:nth-child(2) td:nth-child(6),
-#axe-tabulka tr:nth-child(2) td:nth-child(6),
-#sword-tabulka tr:nth-child(2) td:nth-child(6),
-#npot-tabulka tr:nth-child(2) td:nth-child(6),
-#pot-tabulka tr:nth-child(2) td:nth-child(6),
-#smp-tabulka tr:nth-child(2) td:nth-child(6),
-#uhc-tabulka tr:nth-child(2) td:nth-child(6),
-#diasmp-tabulka tr:nth-child(2) td:nth-child(6),
-#cpvp-tabulka tr:nth-child(2) td:nth-child(7),
-#axe-tabulka tr:nth-child(2) td:nth-child(7),
-#sword-tabulka tr:nth-child(2) td:nth-child(7),
-#npot-tabulka tr:nth-child(2) td:nth-child(7),
-#pot-tabulka tr:nth-child(2) td:nth-child(7),
-#smp-tabulka tr:nth-child(2) td:nth-child(7),
-#uhc-tabulka tr:nth-child(2) td:nth-child(7),
-#diasmp-tabulka tr:nth-child(2) td:nth-child(7) {
+#cpvp-tabulka tr:nth-child(1) td:nth-child(6),
+#axe-tabulka tr:nth-child(1) td:nth-child(6),
+#sword-tabulka tr:nth-child(1) td:nth-child(6),
+#npot-tabulka tr:nth-child(1) td:nth-child(6),
+#pot-tabulka tr:nth-child(1) td:nth-child(6),
+#smp-tabulka tr:nth-child(1) td:nth-child(6),
+#uhc-tabulka tr:nth-child(1) td:nth-child(6),
+#diasmp-tabulka tr:nth-child(1) td:nth-child(6),
+#cpvp-tabulka tr:nth-child(1) td:nth-child(7),
+#axe-tabulka tr:nth-child(1) td:nth-child(7),
+#sword-tabulka tr:nth-child(1) td:nth-child(7),
+#npot-tabulka tr:nth-child(1) td:nth-child(7),
+#pot-tabulka tr:nth-child(1) td:nth-child(7),
+#smp-tabulka tr:nth-child(1) td:nth-child(7),
+#uhc-tabulka tr:nth-child(1) td:nth-child(7),
+#diasmp-tabulka tr:nth-child(1) td:nth-child(7) {
     background: #535353;
 }
 
