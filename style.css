@@ -85,7 +85,7 @@ section {
 
 @media (max-width: 768px) {
     header {
-        width: 100%;
+        width: 120%;
     }
     body {
         margin: 1px;
@@ -94,7 +94,7 @@ section {
         font-size: 18px;
         display: block;
         text-align: center;
-        width: 98%;
+        width: 120%;
     }
 
     nav ul li {
