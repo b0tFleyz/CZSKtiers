@@ -84,27 +84,27 @@ section {
 }
 
 @media (max-width: 768px) {
-    header {
-        width: 100%;
-    }
     body {
         margin: 1px;
+    }
+    header{
+        width: 94%;
     }
     nav ul {
         font-size: 18px;
         display: block;
         text-align: center;
-        width: 109%;
+        width: 100%;
     }
 
     nav ul li {
-        display: block;
-        margin: 15px 0;
+        display: inline-block;
+        margin: 11px 0;
     }
 
     nav ul li a {
         display: inline-flex;
-        padding: 12px 20px;
+        padding: 12px 15px;
     }
 
     nav ul li a img {
@@ -113,7 +113,7 @@ section {
 
     .tabulka {
         display: block;
-        width: 90%;
+        width: 80%;
         overflow-x: auto;
     }
 
@@ -167,6 +167,9 @@ section {
 
     .tabulka tr>td:nth-child(-n+4) {
         order: 0;
+    }
+    .tabulka {
+        max-width: 97%;;
     }
 }
 
