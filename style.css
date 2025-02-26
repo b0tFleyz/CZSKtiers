@@ -51,7 +51,6 @@ nav ul li a:hover {
 
 nav ul li a img {
     max-width: 25px;
-    transition: transform 0.3s;
 }
 
 nav ul li a:hover img {
@@ -184,45 +183,38 @@ section {
     border-radius: 30px;
     border: 35px solid #333;
     overflow: hidden;
-    width: 59.6%;
+    width: 75%;
     background-color: rgb(56, 54, 54);
 }
 
-.tabulka th, .tabulka td {
-    border: 1px solid #ddd;
-    padding: calc(4px + (8 - 4) * ((100vw - 320px) / (1600 - 320)));
-    text-align: center;
-    font-size: calc(10px + (14 - 10) * ((100vw - 320px) / (1600 - 320)));
-}
 
 .tabulka th {
     background-color: #f2f2f2;
 }
 
 .tabulka.active {
-    display: block;
+    display: table;
 }
 
+.tabulka th, .tabulka td {
+    border: 1px solid #ddd;
+    text-align: center;
+}
 .tabulka th,
 .tabulka td {
     border: none;
-    padding-left: calc(10px + (15 - 10) * ((100vw - 320px) / (1600 - 320)));
-    padding-right: calc(10px + (15 - 10) * ((100vw - 320px) / (1600 - 320)));
     font-family: 'Poppins', sans-serif;
     color: white;
 }
-
-.tabulka td:nth-child(1) {
-    font-size: calc(16px + (20 - 16) * ((100vw - 320px) / (1600 - 320)));
+.tabulka img {
+    max-width: 100%;
+    height: auto;
 }
 
 .tabulka td:nth-child(2) {
     display: flex;
 }
 
-.tabulka td:nth-child(12) {
-    min-width: 50px;
-}
 
 tbody tr:nth-child(1) td:first-child,
 tbody tr:nth-child(1) td:nth-child(2) {
@@ -239,8 +231,20 @@ tbody tr:nth-child(3) td:nth-child(2) {
     background-color: #cd7f32;
 }
 
+
 #overall-tabulka td:nth-child(4) {
     background-color: #141212;
+}
+
+#cpvp-tabulka,
+#axe-tabulka,
+#sword-tabulka,
+#npot-tabulka,
+#pot-tabulka,
+#smp-tabulka,
+#uhc-tabulka,
+#diasmp-tabulka {
+    background-color: rgba(27, 27, 105, 0.459);
 }
 
 #cpvp-tabulka tr:nth-child(1) td:nth-child(3),
@@ -306,8 +310,31 @@ tbody tr:nth-child(3) td:nth-child(2) {
 #diasmp-tabulka tr:nth-child(n+4) td:nth-child(3) {
     background-color: rgba(253, 253, 253, 0);
 }
+@media (min-width: 769px) {
+    .tabulka th, .tabulka td {
+        padding: clamp(1px, 1vw, 4px);
+        font-size: clamp(1px, 1vw, 32px);
+    }
+    .tabulka th,
+    .tabulka td {
+        padding-left: clamp(1px, 1vw, 28px);
+        padding-right: clamp(1px, 1vw, 28px);
 
+    }
+    .tabulka img {
+        width: clamp(1px, 2vw, 120px);
+    }
+    .tabulka td:nth-child(1) {
+        font-size: clamp(1px, 2vw, 120px);
+    }
+}
 @media (max-width: 768px) {
+    header{
+        width: 94%;
+    }
+    nav ul {
+        width: 96%;
+    }
     .tabulka {
         display: block;
         width: 100%;
@@ -364,5 +391,9 @@ tbody tr:nth-child(3) td:nth-child(2) {
 
     .tabulka tr>td:nth-child(-n+4) {
         order: 0;
+    }
+    .tabulka th, .tabulka td {
+        text-align: center;
+        ;
     }
 }
