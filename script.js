@@ -124,7 +124,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                     img.src = "https://cdn.discordapp.com/emojis/1266555790953676841.webp?size=40";
                     img.alt = novyText;
                     img.style.display = 'block';
-                    img.style.marginLeft = '5px';
                     bunka.appendChild(img);
                 }
 
@@ -133,7 +132,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                     img.src = "https://cdn.discordapp.com/emojis/1341321180329676840.webp?size=40";
                     img.alt = novyText;
                     img.style.display = 'block';
-                    img.style.marginLeft = '5px';
                     bunka.appendChild(img);
                 }
 
@@ -142,7 +140,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                     img.src = "https://cdn.discordapp.com/emojis/1266550161744724060.webp?size=40";
                     img.alt = novyText;
                     img.style.display = 'block';
-                    img.style.marginLeft = '5px';
                     bunka.appendChild(img);
                 }
 
@@ -151,7 +148,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                     img.src = "https://cdn.discordapp.com/emojis/1341321583695892575.webp?size=40";
                     img.alt = novyText;
                     img.style.display = 'block';
-                    img.style.marginLeft = '5px';
                     bunka.appendChild(img);
                 }
 
@@ -160,7 +156,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                     img.src = "https://cdn.discordapp.com/emojis/1266553596858732705.webp?size=40";
                     img.alt = novyText;
                     img.style.display = 'block';
-                    img.style.marginLeft = '5px';
                     bunka.appendChild(img);
                 }
 
@@ -169,7 +164,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                     img.src = "https://cdn.discordapp.com/emojis/1299784615149437072.webp?size=40";
                     img.alt = novyText;
                     img.style.display = 'block';
-                    img.style.marginLeft = '3px';
                     bunka.appendChild(img);
                 }
 
@@ -178,7 +172,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                     img.src = "https://cdn.discordapp.com/emojis/1266553957543579760.webp?size=40";
                     img.alt = novyText;
                     img.style.display = 'block';
-                    img.style.marginLeft = '11px';
                     bunka.appendChild(img);
                 }
 
@@ -187,7 +180,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                     img.src = "https://cdn.discordapp.com/emojis/1335283642490032138.webp?size=40";
                     img.alt = novyText;
                     img.style.display = 'block';
-                    img.style.marginLeft = '5px';
                     bunka.appendChild(img);
                 }
             }
