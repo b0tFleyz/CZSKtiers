@@ -37,7 +37,6 @@ nav ul li a {
     padding: 12px 20px;
     background-color: #555;
     border-radius: 25px;
-    transition: background-color 0.3s, box-shadow 0.3s;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -87,7 +86,7 @@ section {
         margin: 1px;
     }
     header{
-        width: 92%;
+        width: 94%;
     }
     nav ul {
         font-size: 18px;
@@ -209,6 +208,7 @@ section {
 .tabulka img {
     max-width: 100%;
     height: auto;
+    margin-left: 15%;
 }
 
 .tabulka td:nth-child(2) {
@@ -312,13 +312,13 @@ tbody tr:nth-child(3) td:nth-child(2) {
 }
 @media (min-width: 769px) {
     .tabulka th, .tabulka td {
-        padding: clamp(1px, 1vw, 4px);
-        font-size: clamp(1px, 1vw, 32px);
+        padding: clamp(2px, 1vw, 4px);
+        font-size: clamp(2px, 1vw, 32px);
     }
     .tabulka th,
     .tabulka td {
-        padding-left: clamp(1px, 1vw, 28px);
-        padding-right: clamp(1px, 1vw, 28px);
+        padding-left: clamp(2px, 1vw, 28px);
+        padding-right: clamp(2px, 1vw, 28px);
 
     }
     .tabulka img {
@@ -329,6 +329,12 @@ tbody tr:nth-child(3) td:nth-child(2) {
     }
 }
 @media (max-width: 768px) {
+    header{
+        width: 91%;
+    }
+    nav ul {
+        width: 97%;
+    }
     .tabulka {
         display: block;
         width: 100%;
@@ -389,5 +395,14 @@ tbody tr:nth-child(3) td:nth-child(2) {
     .tabulka th, .tabulka td {
         text-align: center;
         ;
+    }
+    .tabulka tr>td:nth-child(n+5):nth-child(-n+13) img{
+        margin-left: 46%;
+    }
+    tbody tr:nth-child(1) td:first-child{
+        min-width: none;
+    }
+    tbody tr:nth-child(1) td:nth-child(2) {
+        min-width: 50%;
     }
 }
