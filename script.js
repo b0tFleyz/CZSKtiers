@@ -107,9 +107,9 @@ document.addEventListener('DOMContentLoaded', async function () {
                 case "24": novyText = "LT2"; barvaTextu = "black"; barvaPozadi = "#888D95"; break;
                 case "48": novyText = "LT1"; barvaTextu = "black"; barvaPozadi = "#D5B355"; break;
                 case "60": novyText = "HT1"; barvaTextu = "black"; barvaPozadi = "#FFCF4A"; break;
-                case "22": novyText = "RTL2"; barvaTextu = "#888D95"; break;
+                case "22": novyText = "RLT2"; barvaTextu = "#888D95"; break;
                 case "29": novyText = "RHT2"; barvaTextu = "#9EAFC6"; break;
-                case "43": novyText = "RTL1"; barvaTextu = "#D5A349"; break;
+                case "43": novyText = "RLT1"; barvaTextu = "#D5A349"; break;
                 case "54": novyText = "RHT1"; barvaTextu = "#FFCC47"; break;
                 default: barvaPozadi = "#EEE0CB"; break;
             }
