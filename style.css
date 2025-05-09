@@ -166,6 +166,88 @@ section {
     .tabulka tr>td:nth-child(-n+4) {
         order: 0;
     }
+
+    .tabulka td:nth-child(2) {
+        width: 800px; /* Nastav pevnou šířku podle potřeby */
+        text-align: center;
+    }
+    .tabulka td:nth-child(2) img {
+        width: 80px; /* Zajistí, že obrázky budou mít správnou velikost */
+        height: 80px;
+        display: block;
+        margin: 0 auto;
+    }
+
+    .tabulka tr {
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    .tabulka td:nth-child(1), /* První sloupec */
+    .tabulka td:nth-child(3), /* Třetí sloupec */
+    .tabulka td:nth-child(4) { /* Čtvrtý sloupec */
+        flex: 1; /* Zmenšuje se podle dostupného prostoru */
+        text-align: center;
+    }
+
+    .tabulka td:nth-child(2) { /* Druhý sloupec */
+        flex: 0 0 80px; /* Pevná šířka 80px */
+        text-align: center;
+    }
+
+    .tabulka td:nth-child(2) img {
+        width: 80px;
+        height: 80px;
+        display: block;
+        margin: 0 auto;
+    }
+
+    .tabulka tr {
+        display: flex;
+        flex-wrap: wrap; /* Umožní zalomení sloupců na další řádek */
+    }
+
+    .tabulka td {
+        box-sizing: border-box;
+        padding: 5px;
+        font-size: 14px;
+        text-align: center;
+    }
+
+    .tabulka td:nth-child(2) { /* Druhý sloupec (obrázek) */
+        flex: 0 0 80px; /* Pevná šířka 80px */
+        height: 80px; /* Pevná výška */
+        text-align: center;
+    }
+
+    .tabulka td:nth-child(2) img {
+        width: 80px;
+        height: 80px;
+        display: block;
+        margin: 0 auto;
+    }
+
+    .tabulka td:nth-child(1), /* První sloupec */
+    .tabulka td:nth-child(3), /* Třetí sloupec */
+    .tabulka td:nth-child(4) { /* Čtvrtý sloupec */
+        flex: 1 0 100%; /* Zaberou celý řádek pod obrázkem */
+    }
+
+    tbody tr td {
+        background-color: inherit; /* Zajistí, že všechny buňky mají stejný styl */
+    }
+
+    tbody tr td:first-child,
+    tbody tr td:nth-child(2) {
+        background-color: #eecd14; /* Styl pozadí pro všechny řádky */
+    }
+
+    .tabulka td:nth-child(2) img {
+        width: 80px; /* Pevná šířka obrázku */
+        height: 80px; /* Pevná výška obrázku */
+        display: block;
+        margin: -10px auto 0 auto; /* Posune obrázek výše */
+    }
 }
 
 .table-container {
@@ -212,7 +294,9 @@ section {
 }
 
 .tabulka td:nth-child(2) {
-    display: flex;
+    width: 80px; /* Pevná šířka */
+    height: 80px; /* Pevná výška */
+    text-align: center;
 }
 
 
@@ -404,5 +488,15 @@ tbody tr:nth-child(3) td:nth-child(2) {
     }
     tbody tr:nth-child(1) td:nth-child(2) {
         min-width: 50%;
+    }
+    .tabulka td:nth-child(2) {
+        width: 80px; /* Nastav pevnou šířku podle potřeby */
+        text-align: center;
+    }
+    .tabulka td:nth-child(2) img {
+        width: 80px; /* Zajistí, že obrázky budou mít správnou velikost */
+        height: 80px;
+        display: block;
+        margin: -10px auto 0 auto; /* Posune obrázek výše */
     }
 }
