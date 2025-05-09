@@ -34,6 +34,26 @@ document.addEventListener('DOMContentLoaded', async function () {
                 if (rankCell) {
                     rankCell.textContent = currentRank;
                 }
+
+                // Nastavení stylů pro všechny řádky
+                const druhySloupec = row.querySelector('td:nth-child(2)');
+                if (druhySloupec) {
+                    const imgElement = document.createElement('img');
+                    imgElement.src = "https://cdn.discordapp.com/emojis/1266555790953676841.webp?size=96"; // URL obrázku
+                    imgElement.alt = "Obrázek";
+                    imgElement.style.width = '80px';
+                    imgElement.style.height = '80px';
+                    imgElement.style.display = 'block';
+                    imgElement.style.margin = '0 auto';
+                    druhySloupec.innerHTML = ''; // Vyčistí obsah buňky
+                    druhySloupec.appendChild(imgElement);
+                }
+
+                // Přidání stylů pro ostatní sloupce
+                row.querySelectorAll('td:nth-child(1), td:nth-child(3), td:nth-child(4)').forEach(cell => {
+                    cell.style.flex = '1 0 100%'; // Zajistí, že se sloupce zalomí pod obrázek
+                    cell.style.textAlign = 'center';
+                });
             });
 
             rows.forEach(row => {
@@ -107,9 +127,9 @@ document.addEventListener('DOMContentLoaded', async function () {
                 case "24": novyText = "LT2"; barvaTextu = "black"; barvaPozadi = "#888D95"; break;
                 case "48": novyText = "LT1"; barvaTextu = "black"; barvaPozadi = "#D5B355"; break;
                 case "60": novyText = "HT1"; barvaTextu = "black"; barvaPozadi = "#FFCF4A"; break;
-                case "22": novyText = "RLT2"; barvaTextu = "#888D95"; break;
+                case "22": novyText = "RTL2"; barvaTextu = "#888D95"; break;
                 case "29": novyText = "RHT2"; barvaTextu = "#9EAFC6"; break;
-                case "43": novyText = "RLT1"; barvaTextu = "#D5A349"; break;
+                case "43": novyText = "RTL1"; barvaTextu = "#D5A349"; break;
                 case "54": novyText = "RHT1"; barvaTextu = "#FFCC47"; break;
                 default: barvaPozadi = "#EEE0CB"; break;
             }
