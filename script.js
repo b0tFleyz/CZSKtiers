@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 { tier: row.Axe, icon: "kit_icons/axe.png" },
                 { tier: row.Sword, icon: "kit_icons/sword.png" },
                 { tier: row.UHC, icon: "kit_icons/uhc.png" },
-                { tier: row.NPot, icon: "kit_icons/npot.png" },
+                { tier: row.Npot, icon: "kit_icons/npot.png" },
                 { tier: row.Pot, icon: "kit_icons/pot.png" },
                 { tier: row.SMP, icon: "kit_icons/smp.png" },
                 { tier: row.DiaSMP, icon: "kit_icons/diasmp.png" },
