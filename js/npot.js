@@ -6,14 +6,11 @@ document.addEventListener('DOMContentLoaded', function () {
 			const workbook = XLSX.read(data, { type: 'array' });
 			const worksheet = workbook.Sheets[workbook.SheetNames[0]];
 			const rows = XLSX.utils.sheet_to_json(worksheet);
-			window.npotRows = rows;
-			players = rows
-				.filter(row => row.UUID && row.Nick)
-				.map(row => ({
-					uuid: row.UUID,
-					nick: row.Nick,
-					npot: normalizeTier(row.NPot)
-				}));
+			players = rows.filter(row => row.UUID && row.Nick).map(row => ({
+				uuid: row.UUID,
+				nick: row.Nick,
+				npot: normalizeTier(row.Npot)
+			}));
 			renderNpotTable(players);
 		});
 	function normalizeTier(val) {
@@ -61,46 +58,14 @@ document.addEventListener('DOMContentLoaded', function () {
 			players.filter(p => p.npot === tierObj.ht).forEach(player => {
 				const div = document.createElement('div');
 				div.className = 'kit-player';
-				let nameClass = '';
-				if (player.nick.length > 18) nameClass = 'long-name-2';
-				else if (player.nick.length > 14) nameClass = 'long-name-1';
-				div.innerHTML = `<img src='https://render.crafty.gg/3d/bust/${player.uuid}' alt='skin' style='width:32px;height:32px;border-radius:8px;margin-right:8px;vertical-align:middle;'><span class='${nameClass}'>${player.nick}</span>`;
-				div.onclick = () => {
-					const allRows = window.npotRows || [];
-					const row = allRows.find(r => r.UUID === player.uuid);
-					const score = row && row.NPot ? row.NPot : 0;
-					const playerData = {
-						name: player.nick,
-						position: 0,
-						score: score,
-						skin: `https://render.crafty.gg/3d/bust/${player.uuid}`,
-						kitsHtml: '',
-					};
-					showPlayerModal(playerData);
-				};
+				div.innerHTML = `<img src='https://render.crafty.gg/3d/bust/${player.uuid}' alt='skin' style='width:32px;height:32px;border-radius:8px;margin-right:8px;vertical-align:middle;'><span>${player.nick}</span>`;
 				list.appendChild(div);
 			});
 			// Poté LT hráči
 			players.filter(p => p.npot === tierObj.lt).forEach(player => {
 				const div = document.createElement('div');
 				div.className = 'kit-player kit-player-lt';
-				let nameClass = '';
-				if (player.nick.length > 18) nameClass = 'long-name-2';
-				else if (player.nick.length > 14) nameClass = 'long-name-1';
-				div.innerHTML = `<img src='https://render.crafty.gg/3d/bust/${player.uuid}' alt='skin' style='width:32px;height:32px;border-radius:8px;margin-right:8px;vertical-align:middle;'><span class='${nameClass}'>${player.nick}</span>`;
-				div.onclick = () => {
-					const allRows = window.npotRows || [];
-					const row = allRows.find(r => r.UUID === player.uuid);
-					const score = row && row.NPot ? row.NPot : 0;
-					const playerData = {
-						name: player.nick,
-						position: 0,
-						score: score,
-						skin: `https://render.crafty.gg/3d/bust/${player.uuid}`,
-						kitsHtml: '',
-					};
-					showPlayerModal(playerData);
-				};
+				div.innerHTML = `<img src='https://render.crafty.gg/3d/bust/${player.uuid}' alt='skin' style='width:32px;height:32px;border-radius:8px;margin-right:8px;vertical-align:middle;'><span>${player.nick}</span>`;
 				list.appendChild(div);
 			});
 			col.appendChild(list);
