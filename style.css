@@ -1,38 +1,93 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;700&display=swap');
 
+/* Plynulé scrollování a základní animace */
+* {
+    scroll-behavior: smooth;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+/* === INDIVIDUÁLNÍ KIT TABULKY === */
 .kit-columns {
     display: flex !important;
     flex-direction: row !important;
     gap: 32px;
-    justify-content: center;
+    justify-content: flex-start; /* Změněno z center na flex-start pro lepší scroll */
     margin-bottom: 40px;
-    background: #23242a;
-    padding: 24px 0;
-    border-radius: 16px;
+    background: #18191f;
+    padding: 32px 16px;
+    border-radius: 20px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    overflow-x: auto; /* Horizontální scrollování */
+    overflow-y: hidden; /* Skryje vertikální scroll */
+    scroll-behavior: smooth;
+    position: relative;
+    /* Webkit scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: #eecd14 #23242a;
 }
+
+.kit-columns::-webkit-scrollbar {
+    height: 8px;
+}
+
+.kit-columns::-webkit-scrollbar-track {
+    background: #23242a;
+    border-radius: 4px;
+}
+
+.kit-columns::-webkit-scrollbar-thumb {
+    background: #eecd14;
+    border-radius: 4px;
+}
+
+.kit-columns::-webkit-scrollbar-thumb:hover {
+    background: #ffe066;
+}
+
+/* Podpora pro touch scrolling na mobilech */
+.kit-columns {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+}
+
+.kit-tier-col {
+    scroll-snap-align: start;
+}
+
 .kit-tier-col {
     background: #23242a;
     border-radius: 18px;
-    padding: 18px 16px 16px 16px;
-    min-width: 220px;
-    max-width: 260px;
-    box-shadow: 0 4px 24px #0003;
+    padding: 20px 18px;
+    min-width: 200px; /* Zmenšeno z 240px pro dřívější zmenšování */
+    max-width: 200px; /* Zmenšeno z 240px */
+    width: 200px; /* Zmenšeno z 240px */
+    flex-shrink: 0; /* Zabránit smršťování při scrollování */
+    box-shadow: 0 6px 30px rgba(0,0,0,0.4);
     display: flex;
     flex-direction: column;
     align-items: stretch;
+    border: 2px solid #35363b;
+    /* Odstranění transition pro hover efekty */
 }
+
 .kit-tier-header {
-    font-size: 1.35em;
+    font-size: 1.45em;
     font-weight: bold;
-    color: #fff;
-    margin-bottom: 16px;
+    color: #fff; /* Změněno z #eecd14 na bílou */
+    margin-bottom: 20px;
     text-align: center;
-    letter-spacing: 1px;
+    letter-spacing: 1.2px;
     border-radius: 12px;
-    padding: 8px 0;
-    background: none;
+    padding: 12px 0;
+    background: #35363b; /* Jednoduché šedé pozadí místo gradientu */
+    border: 1px solid #35363b; /* Šedý border místo zlatého */
+    text-shadow: none; /* Odstranění zlatého glow efektu */
 }
+
 .kit-tier-list {
     display: flex;
     flex-direction: column;
@@ -42,44 +97,61 @@
 .kit-player {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    background: #23242a;
-    border-radius: 10px;
-    margin-bottom: 8px;
+    gap: 12px;
+    padding: 12px 18px;
+    background: #35363b;
+    border-radius: 14px;
+    margin-bottom: 12px;
     color: #fff;
-    font-weight: 500;
-    font-size: 1.08em;
-    box-shadow: 0 2px 8px #0002;
-    transition: background 0.15s, color 0.15s;
+    font-weight: 600;
+    font-size: 1.1em;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+    transition: all 0.25s ease;
     cursor: pointer;
+    border-left: 4px solid transparent;
+    position: relative;
 }
+
 .kit-player:hover {
-    background: #fcfafa;
-    color: #2a2323;
+    background: #eecd14;
+    color: #23242a;
+    transform: translateX(8px);
+    border-left-color: #23242a;
+    box-shadow: 0 6px 25px rgba(238, 205, 20, 0.4);
 }
+
 .kit-player img {
-    margin-left: 0;
-    margin-right: 8px;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
     background: #23242a;
-    box-shadow: 0 1px 6px #0002;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+    margin: 0;
+    transition: transform 0.25s ease;
 }
+
+.kit-player:hover img {
+    transform: scale(1.1);
+}
+
 .kit-player span {
-	display: inline-block;
-	max-width: 200px;
-	font-size: 0.8em;
-	text-align: left;
-	margin-left: 0;
-	white-space: normal;
-	overflow: visible;
-	text-overflow: unset;
-	transition: font-size 0.2s;
-    margin-right: 40px;
-    margin-left: -8px;
+    display: inline-block;
+    max-width: 25ch; /* Větší maximální šířka pro velmi dlouhé nicky */
+    font-size: clamp(0.6em, calc(11em / var(--nick-length, 11)), 1em); /* Postupné zmenšování */
+    text-align: left;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: font-size 0.2s;
 }
+
+/* Menší písmo pro dlouhé nicky - postupné zmenšování */
+.kit-player span[title] {
+    font-size: clamp(0.5em, calc(11em / var(--nick-length, 11)), 0.75em);
+    max-width: 30ch;
+}
+
 
 /* Sjednocené styly pro badge řadu v individuálních tabulkách (stejné jako overall) */
 .kit-badge-row {
@@ -595,13 +667,63 @@ tbody tr:nth-child(3) td:nth-child(2) {
         font-size: clamp(1px, 2vw, 120px);
     }
 }
-@media (max-width: 768px) {
-    header{
-        width: auto;
+/* Postupné zmenšování kit tabulek před mobilem */
+@media (max-width: 1200px) {
+    .kit-tier-col {
+        min-width: 180px;
+        max-width: 180px;
+        width: 180px;
+        padding: 18px 14px;
     }
+}
+
+@media (max-width: 1000px) {
+    .kit-tier-col {
+        min-width: 160px;
+        max-width: 160px;
+        width: 160px;
+        padding: 16px 12px;
+    }
+    
+    .kit-columns {
+        gap: 20px; /* Menší gap mezi columns */
+        padding: 24px 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Celkové úpravy pro mobil */
+    body {
+        margin: 8px;
+        font-size: 14px;
+    }
+    
+    header {
+        width: auto;
+        padding: 12px 16px;
+        margin-bottom: 20px;
+    }
+    
+    /* Navigace pro mobil */
     nav ul {
         width: auto;
+        padding: 8px;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
     }
+    
+    nav ul li a {
+        padding: 8px 12px;
+        font-size: 0.9em;
+        gap: 6px;
+    }
+    
+    nav ul li a img {
+        max-width: 20px;
+    }
+    
+    /* Tabulky na mobilu */
     .tabulka,
     .tabulka.active {
         display: block;
@@ -610,71 +732,148 @@ tbody tr:nth-child(3) td:nth-child(2) {
         background: none;
         border: none;
     }
+    
     .tabulka tbody {
         display: block;
         width: 100%;
     }
+    
     .tabulka tr {
         display: flex;
         flex-direction: column;
         align-items: stretch;
-        margin-bottom: 24px;
+        margin-bottom: 16px;
         box-sizing: border-box;
         width: 100%;
         min-width: 0;
+        background: #23242a;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
+    
     .tabulka td, .tabulka th {
         display: block;
         width: 100%;
         box-sizing: border-box;
         text-align: left;
         font-size: 1em;
-        padding: 10px 12px;
+        padding: 6px 0;
+        border: none;
+        background: transparent;
     }
+    
     .tabulka td.rank-cell {
-        font-size: 1.3em;
-        border-radius: 14px 14px 0 0;
-        width: 100%;
-        text-align: left;
-        margin-bottom: 4px;
+        font-size: 1.8em;
+        font-weight: bold;
+        text-align: center;
+        border-radius: 8px;
+        padding: 8px;
+        margin-bottom: 8px;
+        width: auto;
+        display: inline-block;
+        min-width: 50px;
     }
+    
     .tabulka td.player-name {
-        font-size: 1.1em;
-        font-weight: 600;
+        font-size: 1.3em;
+        font-weight: 700;
         color: #fff;
-        margin-bottom: 2px;
-        text-align: left;
+        margin-bottom: 8px;
+        text-align: center;
     }
+    
     .tabulka td.score-cell {
-        font-size: 1.1em;
-        font-weight: 500;
+        font-size: 1.2em;
+        font-weight: 600;
         background: #18191f;
-        color: #fff;
-        border-radius: 0 0 12px 12px;
-        margin-bottom: 4px;
-        text-align: left;
+        color: #eecd14;
+        border-radius: 8px;
+        padding: 8px;
+        text-align: center;
+        margin-bottom: 12px;
     }
+    
     .tabulka td.kits-cell {
-        text-align: left;
-        padding-top: 8px;
+        text-align: center;
+        padding: 12px 8px;
         min-width: 0;
-        flex-wrap: wrap;
-        gap: 4px;
     }
+    
+    /* Kit badges na mobilu - více prostoru a lepší vzhled */
+    .tabulka td.kits-cell .kits-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px; /* Velké mezery mezi badges na mobilu */
+        justify-content: center;
+        align-items: center;
+        padding: 20px 16px; /* Velký padding kolem badges */
+        background: #18191f;
+        border-radius: 12px;
+        margin-top: 8px;
+    }
+    
     .kit-badge {
-        font-size: 0.95em;
-        margin: 2px 4px 2px 0;
-        padding: 2px 8px 2px 4px;
-        min-width: 36px; /* bylo 48px, zmenši na 36px nebo i méně */
-        padding: 0 1px;   /* zmenši padding z 0 2px na 0 1px */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 48px; /* Větší pro lepší dotyk */
+        padding: 8px 6px;
+        border-radius: 10px;
+        background: rgba(35, 36, 42, 0.8);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        transition: transform 0.2s, box-shadow 0.2s;
+        cursor: pointer;
+    }
+    
+    .kit-badge:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    
+    .kit-icon-circle,
+    .kit-icon-missing {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        min-height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: #23242a;
+        margin-bottom: 4px;
+        border: 3px solid; /* Border bude nastavena inline podle tieru */
+    }
+    
+    .kit-icon,
+    .kit-icon-missing svg {
+        width: 22px !important;
+        height: 22px !important;
+        display: block;
+    }
+    
+    .kit-tier-text,
+    .kit-tier-missing {
+        min-width: 38px !important;
+        max-width: 38px !important;
+        font-size: 0.85em !important;
+        padding: 3px 1px !important;
+        border-radius: 8px !important;
+        font-weight: bold !important;
+        text-align: center !important;
+        line-height: 1.1 !important;
     }
 }
 
 .kits-row {
     display: flex;
-    gap: 1px;
+    gap: 6px; /* Ještě větší mezery mezi badges na desktopu */
     align-items: flex-end;
     margin-left: 0;
+    background: #18191f;
+    border-radius: 14px;
+    padding: 10px 12px; /* Ještě větší padding */
 }
 
 .kit-badge {
@@ -685,29 +884,39 @@ tbody tr:nth-child(3) td:nth-child(2) {
     font-size: 0.95em;
     background: none;
     box-shadow: none;
-    padding: 0;
+    padding: 4px; /* Ještě větší padding */
     border: none;
     cursor: pointer;
     position: relative;
+    min-width: 48px; /* Ještě větší minimum */
+    transition: transform 0.2s;
+}
+
+.kit-badge:hover {
+    transform: scale(1.1); /* Ještě větší hover efekt */
 }
 
 .kit-icon-circle {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 36px; /* Ještě větší kruh */
+    height: 36px;
     border-radius: 50%;
-    border: 3px solid #eecd14; /* výchozí, bude přepsáno inline */
+    border: 3px solid #eecd14; /* Silnější border */
     background: #23242a;
-    margin-bottom: 0px;
-    margin-top: 2px;
-    transition: border-color 0.2s;
+    margin-bottom: 4px; /* Ještě větší mezera */
+    margin-top: 1px;
+    transition: border-color 0.2s, transform 0.2s;
+}
+
+.kit-icon-circle:hover {
+    transform: scale(1.15); /* Ještě větší hover efekt */
 }
 
 .kit-icon {
-    width: 22px;
-    height: 22px;
+    width: 26px; /* Ještě větší ikona */
+    height: 26px;
     background: none;
     border-radius: 50%;
     display: block;
@@ -715,11 +924,14 @@ tbody tr:nth-child(3) td:nth-child(2) {
 
 .kit-tier-text {
     display: block;
-    min-width: 22px; /* bylo 28px, zmenši na 22px */
-    padding: 2px 6px; /* zmenši padding z 2px 10px na 2px 6px */
-    border-radius: 8px;
-    box-shadow: 0 1px 4px #0003;
+    min-width: 38px; /* Ještě větší text area */
+    padding: 4px 6px; /* Ještě větší padding */
+    border-radius: 10px; /* Ještě větší zaoblení */
+    box-shadow: 0 2px 6px #0004; /* Ještě silnější stín */
     line-height: 1.1;
+    font-size: 0.95em; /* Ještě větší text */
+    text-align: center;
+    font-weight: bold;
 }
 
 /* Tooltip */
@@ -778,75 +990,85 @@ tbody tr:nth-child(3) td:nth-child(2) {
     border-radius: 0 16px 16px 0;
 }
 
-/* Větší badge */
+/* Jednotné styly pro všechny kit badges */
 .kit-badge,
 .kit-badge-missing {
-    min-width: 54px !important;
-    max-width: 54px !important;
-    width: 54px !important;
+    min-width: 48px !important; /* Ještě větší pro lepší viditelnost */
+    max-width: 48px !important;
+    width: 48px !important;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
-    padding: 0;
+    padding: 4px; /* Ještě větší padding */
     box-sizing: border-box;
 }
 
-/* Větší kruh pro ikonu i pro čárkovaný kruh */
+/* Jednotné styly pro ikony */
 .kit-icon-circle,
 .kit-icon-missing {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    min-height: 32px;
-    max-width: 32px;
-    max-height: 32px;
+    width: 36px; /* Ještě větší kruhy */
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    max-width: 36px;
+    max-height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-top: 2px;
-    margin-bottom: 0;
+    margin-top: 1px;
+    margin-bottom: 4px; /* Ještě větší mezera */
     box-sizing: border-box;
     background: #23242a;
     border-radius: 50%;
+    border: 3px solid; /* Silnější border */
+    transition: transform 0.2s, border-color 0.2s;
 }
 
-/* Ikona samotná větší */
+.kit-icon-circle:hover,
+.kit-icon-missing:hover {
+    transform: scale(1.1); /* Ještě větší hover efekt */
+}
+
+/* Jednotné styly pro ikony samotné */
 .kit-icon,
 .kit-icon-missing svg {
-    width: 22px !important;
-    height: 22px !important;
+    width: 26px !important; /* Ještě větší ikony */
+    height: 26px !important;
     display: block;
 }
+
 .kit-icon-missing svg {
     margin: 0;
     padding: 0;
 }
+
 .kit-icon-missing svg circle {
-    stroke: #5a5a5a;
-    stroke-width: 4;
+    stroke: #666;
+    stroke-width: 3;
     fill: none;
-    stroke-dasharray: 4;
-    cx: 11;
-    cy: 11;
-    r: 9;
+    stroke-dasharray: 5; /* Ještě větší čárky */
+    cx: 13;
+    cy: 13;
+    r: 10; /* Ještě větší poloměr */
 }
 
-/* Větší pozadí za textem tieru */
+/* Jednotné styly pro tier text */
 .kit-tier-text,
 .kit-tier-missing {
     display: block;
-    min-width: 42px !important;
-    max-width: 42px !important;
-    width: 42px !important;
-    padding: 4px 0 !important;
-    font-size: 1.13em !important;
-    border-radius: 10px !important;
-    margin-top: 6px !important;
-    background: #23242a;
-    color: #5a5a5a;
+    min-width: 40px !important; /* Ještě větší text area */
+    max-width: 40px !important;
+    width: 40px !important;
+    padding: 5px 2px !important; /* Ještě větší padding */
+    font-size: 0.95em !important; /* Ještě větší text */
+    border-radius: 10px !important; /* Ještě větší zaoblení */
+    margin-top: 4px !important; /* Ještě větší mezera */
     text-align: center;
+    font-weight: bold;
+    line-height: 1.1;
     box-sizing: border-box;
+    box-shadow: 0 2px 6px #0004; /* Ještě silnější stín */
 }
 
 /* Moderní vzhled řádků */
@@ -909,11 +1131,10 @@ tbody tr:nth-child(3) td:nth-child(2) {
     align-items: center;
     font-weight: 700;
     font-size: 1em;
-    margin-left: 4px;
+    margin-left: 4px; /* Ještě větší mezera */
     margin-bottom: 2px;
-    padding: 4px 12px 4px 6px;
-    min-width: 36px; /* bylo 48px, zmenši na 36px nebo i méně */
-    padding: 0 1px;   /* zmenši padding z 0 2px na 0 1px */
+    padding: 4px; /* Ještě větší padding */
+    min-width: 48px; /* Ještě větší minimum */
 }
 @media (max-width: 900px) {
     .tabulka td.kits-cell {
@@ -988,7 +1209,7 @@ tbody tr:nth-child(3) td:nth-child(2) {
 .tiers-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 1px; /* Velmi malé mezery na desktopu */
     justify-content: center;
     margin-top: 10px;
 }
@@ -1042,13 +1263,27 @@ tbody tr:nth-child(3) td:nth-child(2) {
         font-size: 1.1em;
     }
     .tiers-list {
-        gap: 5px;
+        gap: 16px; /* Větší mezery mezi kit badges na mobilu */
+        margin-top: 10px;
+        justify-content: center;
+        flex-wrap: wrap;
+        padding: 16px 12px; /* Velký padding kolem celé oblasti */
+        background: #18191f;
+        border-radius: 10px;
     }
     .kit-badge {
         font-size: 0.95em;
-        padding: 3px 8px 3px 4px;
-        min-width: 36px; /* bylo 48px, zmenši na 36px nebo i méně */
-        padding: 0 1px;   /* zmenši padding z 0 2px na 0 1px */
+        padding: 6px 4px; /* Velký padding pro lepší dotyk */
+        min-width: 42px; /* Větší minimum pro lepší klikání */
+        border-radius: 8px;
+        background: rgba(35, 36, 42, 0.6);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .kit-badge:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.4);
     }
 }
 .skin {
@@ -1142,91 +1377,161 @@ tbody tr:nth-child(3) td:nth-child(2) {
 
 #overall-tabulka .kits-row {
     display: flex;
-    gap: 0px; /* už je 0, ale pro jistotu */
+    gap: 6px; /* Ještě větší mezery mezi badges na desktopu */
     align-items: flex-end;
     margin-left: 0;
     background: #18191f;
-    border-radius: 16px;
-    padding: 8px 0; /* zmenši padding z 8px 8px na 8px 0 */
+    border-radius: 14px;
+    padding: 10px 12px; /* Ještě větší padding */
 }
 
-#overall-tabulka .kit-cell {
+#overall-tabulka .kit-badge {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-width: 38px;
+    min-width: 48px; /* Ještě větší minimum */
+}
+
+#overall-tabulka .kit-icon-circle {
+    width: 32px; /* Ještě větší kruhy */
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #23242a;
+    border-radius: 50%;
+    border: 3px solid; /* Silnější border */
+    margin-bottom: 4px; /* Ještě větší mezera */
+    transition: transform 0.2s;
+}
+
+#overall-tabulka .kit-icon-circle:hover {
+    transform: scale(1.1); /* Ještě větší hover efekt */
 }
 
 #overall-tabulka .kit-icon {
-    width: 24px;
-    height: 24px;
+    width: 22px; /* Ještě větší ikony */
+    height: 22px;
     background: none;
-    border-radius: 6px;
-    margin-right: 0px;
-    margin-bottom: 1px;
-    background: none;
-    border-radius: 6px;
+    border-radius: 50%;
+    display: block;
 }
 
 #overall-tabulka .kit-tier {
     font-weight: bold;
-    font-size: 0.95em;
-    padding: 2px 18px; /* bylo 2px 8px, zvětšeno */
-    border-radius: 8px;
+    font-size: 0.9em; /* Ještě větší text */
+    padding: 4px 6px; /* Ještě větší padding */
+    border-radius: 10px; /* Ještě větší zaoblení */
     text-align: center;
-    min-width: 38px;
-    margin-top: 1px;
+    min-width: 36px; /* Ještě větší minimum */
+    margin-top: 4px; /* Ještě větší mezera */
     margin-bottom: 1px;
-    box-shadow: 0 1px 4px #0003;
+    box-shadow: 0 2px 6px #0004; /* Ještě silnější stín */
+    line-height: 1.1;
 }
 @media (max-width: 1000px) {
+    /* Header pro střední obrazovky */
     .main-header {
         display: flex;
         flex-direction: column;
         align-items: stretch;
-        padding: 10px 2vw 6px 2vw;
+        padding: 12px 16px;
         min-height: 48px;
-        gap: 0;
+        gap: 12px;
     }
+    
     .main-title {
         order: 1;
-        font-size: 1.3em;
-        margin: 0 0 12px 0;
+        font-size: 1.5em;
+        margin: 0;
         text-align: center;
         width: 100%;
-        pointer-events: auto;
-        user-select: auto;
-        white-space: normal;
     }
+    
     .header-actions {
         order: 2;
         display: flex;
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
-        gap: 18px; /* větší mezera mezi Discord a Najdi hráče */
+        gap: 16px;
         width: 100%;
         margin-top: 0;
-        margin-bottom: 0;
     }
+    
     .discord-link {
-        margin-right: 0;
-        margin-left: 40px;
+        margin: 0;
         flex-shrink: 0;
     }
+    
     .search-box {
-        margin-left: 0;
-        margin-right: 0;
-        min-width: 0;
-        max-width: 140px; /* trochu větší na mobilu */
+        margin: 0;
+        min-width: 140px;
+        max-width: 180px;
         font-size: 0.95em;
-        padding: 0 6px;
-        height: 28px;
-        flex-shrink: 0;
+        padding: 0 8px;
+        height: 32px;
     }
-    #search-input {
-        font-size: 0.95em !important;
-        margin-top: 4px;
+    
+    /* Overall tabulka pro střední obrazovky */
+    #overall-tabulka {
+        max-width: 95vw;
+        padding: 16px 8px;
+        margin: 16px auto;
+    }
+    
+    .player-card {
+        max-width: 100%;
+        padding: 16px 20px;
+        margin-bottom: 12px;
+    }
+    
+    .compact-row {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    
+    .rank-badge {
+        font-size: 1.4em;
+        padding: 8px 12px;
+        min-width: 40px;
+    }
+    
+    .skin {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .player-name {
+        font-size: 1.1em;
+    }
+    
+    .kits-row {
+        padding: 6px 8px;
+        gap: 4px; /* Větší mezera na středních obrazovkách */
+        background: #18191f;
+        border-radius: 8px;
+    }
+    
+    .kit-badge {
+        min-width: 34px !important;
+        max-width: 34px !important;
+    }
+    
+    #overall-tabulka .kit-icon-circle {
+        width: 20px;
+        height: 20px;
+    }
+    
+    #overall-tabulka .kit-icon {
+        width: 14px;
+        height: 14px;
+    }
+    
+    #overall-tabulka .kit-tier {
+        font-size: 0.75em;
+        padding: 1px 3px;
+        min-width: 24px;
     }
 }
 
@@ -1429,81 +1734,272 @@ tbody tr:nth-child(3) td:nth-child(2) {
 }
 
 @media (max-width: 700px) {
+    /* Malé mobily */
+    body {
+        margin: 4px;
+    }
+    
     .main-header {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        padding: 10px 2vw 6px 2vw;
-        min-height: 48px;
-        gap: 0;
-    }
-    .main-title {
-        order: 1;
-        font-size: 1.3em;
-        margin: 0 0 12px 0;
-        text-align: center;
-        width: 100%;
-        pointer-events: auto;
-        user-select: auto;
-        white-space: normal;
-    }
-    .header-actions {
-        order: 2;
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
+        padding: 8px 12px;
         gap: 8px;
-        width: 100%;
-        margin-top: 0;
-        margin-bottom: 0;
     }
+    
+    .main-title {
+        font-size: 1.2em;
+        margin-bottom: 8px;
+    }
+    
+    .header-actions {
+        gap: 8px;
+    }
+    
     .discord-link {
-        margin-right: 0;
-        margin-left: 20px;
+        font-size: 0.9em;
+        margin-left: 8px;
     }
+    
+    .discord-icon {
+        width: 20px;
+        height: 20px;
+    }
+    
     .search-box {
-        margin-left: 0;
-        margin-right: 0;
-        min-width: 0;
         max-width: 120px;
-        font-size: 0.95em;
-        padding: 0 6px;
         height: 28px;
+        padding: 0 6px;
     }
+    
     #search-input {
-        font-size: 0.95em !important;
-        margin-top: 4px;
+        font-size: 0.9em !important;
+    }
+    
+    /* Navigace pro malé mobily */
+    nav ul {
+        padding: 6px;
+        gap: 6px;
+        margin-bottom: 16px;
+    }
+    
+    nav ul li a {
+        padding: 6px 10px;
+        font-size: 0.8em;
+        gap: 4px;
+    }
+    
+    nav ul li a img {
+        max-width: 18px;
+    }
+    
+    /* Overall tabulka pro malé mobily */
+    #overall-tabulka {
+        padding: 12px 4px;
+        margin: 12px auto;
+    }
+    
+    .player-card {
+        padding: 12px 16px;
+        margin-bottom: 8px;
+        border-radius: 12px;
+    }
+    
+    .compact-row {
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        text-align: center;
+    }
+    
+    .rank-badge {
+        font-size: 1.2em;
+        padding: 6px 10px;
+        margin-bottom: 8px;
+    }
+    
+    .skin {
+        width: 50px;
+        height: 50px;
+        margin: 0;
+    }
+    
+    .player-info {
+        margin: 0;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .player-name {
+        font-size: 1em;
+        margin-bottom: 4px;
+    }
+    
+    .score {
+        font-size: 0.9em;
+    }
+    
+    .kits-row {
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 8px; /* Větší mezery na malých mobilech */
+        padding: 12px 10px; /* Více paddingu */
+        background: #18191f;
+        border-radius: 8px;
+    }
+    
+    #overall-tabulka .kit-badge {
+        min-width: 32px !important;
+        max-width: 32px !important;
+    }
+    
+    #overall-tabulka .kit-icon-circle {
+        width: 20px;
+        height: 20px;
+    }
+    
+    #overall-tabulka .kit-icon {
+        width: 14px;
+        height: 14px;
+    }
+    
+    #overall-tabulka .kit-tier {
+        font-size: 0.7em;
+        padding: 1px 3px;
+        min-width: 22px;
     }
 }
 @media (max-width: 900px) {
+    /* Navigace pro tablety a střední mobily */
     nav ul {
         flex-wrap: wrap;
-        flex-direction: row;        /* DŮLEŽITÉ! */
+        flex-direction: row;
         justify-content: center;
-        align-items: stretch;
-        gap: 8px;
+        align-items: center;
+        gap: 6px;
+        padding: 8px;
     }
+    
     nav ul li {
         display: flex;
-        flex: 1 1 120px;           /* šířka jednoho tlačítka, uprav dle potřeby */
-        min-width: 120px;
-        max-width: 220px;
+        flex: 1 1 110px;
+        min-width: 110px;
+        max-width: 200px;
         margin: 0;
     }
+    
     nav ul li a {
         width: 100%;
         justify-content: center;
-        font-size: 1em;
-        padding: 10px 12px;
+        font-size: 0.9em;
+        padding: 8px 10px;
         box-sizing: border-box;
+        gap: 6px;
+    }
+    
+    nav ul li a img {
+        max-width: 22px;
+    }
+    
+    /* Tabulky pro střední obrazovky */
+    .tabulka td.kits-cell {
+        min-width: 0;
+        font-size: 0.9em;
+        padding-right: 8px;
+    }
+    
+    .kit-badge {
+        font-size: 0.85em;
+        padding: 2px 4px;
+        margin: 1px;
+    }
+    
+    .tabulka td.skin-cell img {
+        width: 36px;
+        height: 36px;
+    }
+    
+    /* Kit columns - horizontální scroll i na malých obrazovkách */
+    .kit-columns {
+        flex-direction: row !important; /* Zůstává horizontální i na mobilu */
+        gap: 20px;
+        padding: 20px 12px;
+        background: #18191f;
+        border-radius: 16px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        justify-content: flex-start;
+    }
+    
+    .kit-tier-col {
+        min-width: 200px; /* Menší na mobilu, ale stále pevná šířka */
+        max-width: 200px;
+        width: 200px;
+        flex-shrink: 0; /* Důležité pro horizontální scroll */
+        margin: 0; /* Zruší auto centrování */
+        background: #23242a;
+        border: 2px solid #35363b;
+        border-radius: 16px;
+        padding: 16px 12px; /* Menší padding na mobilu */
+        box-shadow: 0 6px 25px rgba(0,0,0,0.5);
+    }
+    
+    .kit-tier-header {
+        font-size: 1.3em;
+        margin-bottom: 16px;
+        padding: 10px 0;
+        background: #35363b; /* Jednoduché šedé pozadí */
+        border: 1px solid #35363b; /* Šedý border */
+        color: #fff; /* Bílý text místo zlatého */
+        text-shadow: none; /* Bez glow efektu */
+    }
+    
+    .kit-player {
+        padding: 12px 16px; /* Zvětšené mezery pro lepší dotyk */
+        font-size: 1em;
+        margin-bottom: 12px; /* Větší mezery mezi hráči */
+        background: #35363b;
+        border-left: 3px solid transparent;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 10px; /* Mezera mezi avatarem a jménem */
+    }
+    
+    .kit-player:hover {
+        background: #eecd14;
+        color: #23242a;
+        border-left-color: #23242a;
+        transform: translateX(6px);
+    }
+    
+    .kit-player img {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+    }
+    
+    .kit-player span {
+        font-size: clamp(0.5em, calc(10em / var(--nick-length, 10)), 0.9em); /* Postupné zmenšování na mobilu */
+        font-weight: 600;
+        max-width: 25ch; /* Větší šířka pro dlouhé nicky */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    /* Menší písmo pro dlouhé nicky na mobilu - postupné zmenšování */
+    .kit-player span[title] {
+        font-size: clamp(0.4em, calc(10em / var(--nick-length, 10)), 0.65em);
+        max-width: 30ch;
     }
 }
 
 .kit-player-lt {
-    background: #4d4d4d !important;
+    background: #23242a !important;
 }
 
 .kit-player-lt:hover {
-    background: #ffffff !important;
+    background: #eecd14 !important;
+    color: #23242a !important;
+    transform: translateX(8px);
+    border-left-color: #23242a;
+    box-shadow: 0 6px 25px rgba(238, 205, 20, 0.4);
 }
