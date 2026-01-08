@@ -1,8 +1,13 @@
 document.addEventListener('DOMContentLoaded', function () {
     // Načti data z Excelu (overall)
     let players = [];
-    fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx')
-        .then(res => res.arrayBuffer())
+    // Přidej cache-busting parametr pro aktuální čas, aby se data vždy načetla čerstvá
+    const cacheBuster = new Date().getTime();
+    fetch(`https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx&_=${cacheBuster}`)
+        .then(res => {
+            if (!res.ok) throw new Error('Nepodařilo se načíst data');
+            return res.arrayBuffer();
+        })
         .then(data => {
             const workbook = XLSX.read(data, { type: 'array' });
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -22,6 +27,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 mace: row.Mace
             }));
             setActiveKitFromHash();
+        })
+        .catch(error => {
+            console.error('Chyba při načítání dat:', error);
+            const tabulka = document.getElementById('overall-tabulka');
+            if (tabulka) {
+                tabulka.innerHTML = '<div style="text-align:center;padding:40px;color:#fff;"><h3>Nepodařilo se načíst data</h3><p>Zkuste obnovit stránku</p></div>';
+            }
         });
 
     // Kits mapping for navigation
@@ -74,7 +86,25 @@ document.addEventListener('DOMContentLoaded', function () {
             players.filter(p => (p[kitKey] || '').trim() === tierObj.name).forEach(player => {
                 const div = document.createElement('div');
                 div.className = 'kit-player';
-                div.innerHTML = `<img src='https://render.crafty.gg/3d/bust/${player.nick}' alt='skin' style='width:32px;height:32px;border-radius:8px;margin-right:8px;vertical-align:middle;'><span>${player.nick}</span>`;
+                
+                // Vytvoř img element s error handlingem
+                const img = document.createElement('img');
+                // Escapuj nick pro URL (mezery a speciální znaky)
+                const escapedNick = encodeURIComponent(player.nick);
+                img.src = `https://render.crafty.gg/3d/bust/${escapedNick}`;
+                img.alt = 'skin';
+                img.style.cssText = 'width:32px;height:32px;border-radius:8px;margin-right:8px;vertical-align:middle;';
+                
+                // Fallback na placeholder pokud se skin nenačte
+                img.onerror = function() {
+                    this.src = `https://crafatar.com/avatars/${escapedNick}?size=32&default=MHF_Steve&overlay`;
+                };
+                
+                const span = document.createElement('span');
+                span.textContent = player.nick;
+                
+                div.appendChild(img);
+                div.appendChild(span);
                 list.appendChild(div);
             });
             col.appendChild(list);
