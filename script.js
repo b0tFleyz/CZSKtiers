@@ -248,11 +248,12 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (!container) return;
         container.innerHTML = '';
         
-        const sortedPlayers = [...overallData].sort((a, b) => b.score - a.score).slice(0, 99);
+        // Seřaď všechny hráče
+        const allSortedPlayers = [...overallData].sort((a, b) => b.score - a.score);
         
-        // Inicializuj autocomplete
+        // Inicializuj autocomplete se VŠEMI hráči
         if (allPlayers.length === 0) {
-            allPlayers = sortedPlayers.map(p => ({
+            allPlayers = allSortedPlayers.map(p => ({
                 nick: p.nick,
                 score: p.score,
                 uuid: p.uuid,
@@ -260,6 +261,9 @@ document.addEventListener('DOMContentLoaded', async function () {
             }));
             initAutocomplete(allPlayers);
         }
+        
+        // Pro zobrazení použij jen top 99
+        const sortedPlayers = allSortedPlayers.slice(0, 99);
         
         // Virtuální scrolling - načti jen prvních 20 karet
         const INITIAL_LOAD = 20;
