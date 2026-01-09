@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="cz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#23242a">
+    <title>CZSK Tierlist – Overall</title>
+    <!-- Preconnect to external domains for faster loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://mc-heads.net">
+    <link rel="preconnect" href="https://docs.google.com">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="main-header">
+        <h1 class="main-title">CZSK Tierlist</h1>
+        <div class="header-actions">
+            <a href="https://discord.gg/rAnR4hfKzw" class="discord-link" target="_blank">
+                <img src="kit_icons/discord.png" alt="Discord" class="discord-icon">
+                <span>Discord</span>
+            </a>
+            <form id="search-form" class="search-box" autocomplete="off">
+                <span class="search-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <circle cx="11" cy="11" r="8" stroke="#23242a" stroke-width="2"/>
+                        <line x1="18" y1="18" x2="15.5" y2="15.5" stroke="#23242a" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </span>
+                <input id="search-input" type="text" placeholder="Najdi hráče..." />
+                <span class="search-shortcut">/</span>
+            </form>
+        </div>
+    </header>
+
+    <nav>
+        <ul>
+            <li><a href="overall.html" class="nav-btn">Overall<img id="kit" src="kit_icons/trophy.png"></a></li>
+            <li><a href="tabulky.html#cpvp-table" class="nav-btn">Cpvp<img id="kit" src="kit_icons/cpvp.png"></a></li>
+            <li><a href="tabulky.html#axe-table" class="nav-btn">Axe<img id="kit" src="kit_icons/axe.png"></a></li>
+            <li><a href="tabulky.html#sword-table" class="nav-btn">Sword<img id="kit" src="kit_icons/sword.png"></a></li>
+            <li><a href="tabulky.html#uhc-table" class="nav-btn">UHC<img id="kit" src="kit_icons/uhc.png"></a></li>
+            <li><a href="tabulky.html#npot-table" class="nav-btn">Npot<img id="kit" src="kit_icons/npot.png"></a></li>
+            <li><a href="tabulky.html#pot-table" class="nav-btn">Pot<img id="kit" src="kit_icons/pot.png"></a></li>
+            <li><a href="tabulky.html#smp-table" class="nav-btn">SMP<img id="kit" src="kit_icons/smp.png"></a></li>
+            <li><a href="tabulky.html#diasmp-table" class="nav-btn">DiaSMP<img id="kit" src="kit_icons/diasmp.png"></a></li>
+            <li><a href="tabulky.html#mace-table" class="nav-btn">Mace<img id="kit" src="kit_icons/mace.png"></a></li>
+        </ul>
+    </nav>
+
+    <div id="tabulky">
+        <div class="table-container">
+            <div id="overall-tabulka" class="tabulka active"></div>
+        </div>
+    </div>
+
+    <div id="player-modal" class="player-modal" style="display:none;">
+      <div class="player-modal-content">
+        <span class="player-modal-close">&times;</span>
+        <img class="player-modal-skin" src="" alt="skin" style="width:90px;height:90px;border-radius:50%;margin-bottom:10px;">
+        <div class="player-modal-name"></div>
+        <div class="player-modal-position">
+          <span class="player-modal-rank"></span>
+          <span class="player-modal-score"></span>
+        </div>
+        <div class="player-modal-tiers"></div>
+      </div>
+    </div>
+
+    <section>
+        <p id="konec">Officiální stránka <a id="mctiers" href="https://mctiers.com">MCTiers</a></p>
+    </section>
+
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="tabulky.js"></script>
+</body>
+</html>
