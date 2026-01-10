@@ -82,7 +82,15 @@ document.addEventListener('DOMContentLoaded', function () {
 					showKitPlayerModal(player);
 				}
 			};
+			list.appendChild(div);
+		});
+		col.appendChild(list);
+		columns.appendChild(col);
+	}
+	tabulka.appendChild(columns);
 	// Inicializuj autocomplete
 	if (typeof initAutocomplete === 'function') {
 		initAutocomplete(players);
 	}
+}
+});
