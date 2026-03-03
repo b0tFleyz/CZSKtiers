@@ -140,6 +140,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     let overallData = [];
+    let discordIdToNick = {}; // Discord ID → Nick, built from spreadsheet data
     // Načti overall jako pole objektů a vygeneruj karty
     async function nactiOverallExcel(url) {
         const response = await fetch(url);
@@ -147,6 +148,13 @@ document.addEventListener('DOMContentLoaded', async function () {
         const workbook = XLSX.read(data, { type: 'array' });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(worksheet);
+
+        // Build Discord ID → Nick map for tier history bridging
+        rows.forEach(row => {
+            const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : null;
+            const nick = row.Nick ? String(row.Nick).trim() : null;
+            if (discordId && nick) discordIdToNick[discordId] = nick;
+        });
 
         overallData = rows.map(row => {
             const tiers = [
@@ -169,6 +177,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             return {
                 uuid: row.UUID,
                 nick: row.Nick,
+                discordId: row['Discord ID'] ? String(row['Discord ID']).trim() : '',
                 score: overallScore,
                 tiers: tiers
             };
@@ -234,6 +243,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         await nactiOverallExcel('https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx');
         // Skryj loading indicator po úspěšném načtení
         if (loadingIndicator) loadingIndicator.style.display = 'none';
+        // Načti tier history z TierHistory listu stejného spreadsheetu – best-effort, tiché selhání
+        nactiTierHistory('https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx');
     } catch (error) {
         console.error('Error loading data:', error);
         // Zobraz error message
@@ -257,7 +268,8 @@ document.addEventListener('DOMContentLoaded', async function () {
                 nick: p.nick,
                 score: p.score,
                 uuid: p.uuid,
-                tiers: p.tiers
+                tiers: p.tiers,
+                discordId: p.discordId || ''
             }));
             initAutocomplete(allPlayers);
         }
@@ -307,7 +319,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                     circleColor = info.barvaPozadi;
                 }
                 return `
-                    <span class="kit-badge tooltip">
+                    <span class="kit-badge tooltip" data-kit-icon="${t.icon}">
                         <span class="kit-icon-circle" style="border-color:${circleColor};">
                             <img src="${t.icon}" alt="" class="kit-icon" loading="lazy">
                         </span>
@@ -354,7 +366,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                     position: rank,
                     score: player.score,
                     skin: `https://mc-heads.net/avatar/${player.uuid}/64`,
-                    kitsHtml: kitsHtml
+                    kitsHtml: kitsHtml,
+                    tiers: player.tiers,
+                    nick: player.nick,
+                    discordId: player.discordId || ''
                 });
             });
             return card;
@@ -399,8 +414,282 @@ document.addEventListener('DOMContentLoaded', async function () {
         observer.observe(sentinel);
     }
 
+    // ========== TIER JOURNEY ==========
+
+    // Storage for tier history (keyed by nick)
+    let tierHistory = {};
+
+    async function nactiTierHistory(url) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) return;
+            const data = await response.arrayBuffer();
+            const workbook = XLSX.read(data, { type: 'array' });
+            // Hledá list pojmenovaný 'TierHistory' (vytváří bot)
+            const sheetName = workbook.SheetNames.find(n => n === 'TierHistory');
+            if (!sheetName) return;
+            const worksheet = workbook.Sheets[sheetName];
+            if (!worksheet) return;
+            const rows = XLSX.utils.sheet_to_json(worksheet);
+
+            const iconMap = {
+                'Crystal': 'kit_icons/cpvp.png',
+                'Axe': 'kit_icons/axe.png',
+                'Sword': 'kit_icons/sword.png',
+                'UHC': 'kit_icons/uhc.png',
+                'Npot': 'kit_icons/npot.png', 'NPot': 'kit_icons/npot.png',
+                'Pot': 'kit_icons/pot.png',
+                'SMP': 'kit_icons/smp.png',
+                'DiaSMP': 'kit_icons/diasmp.png',
+                'Mace': 'kit_icons/mace.png'
+            };
+
+            rows.forEach(row => {
+                if (!row.Kit || !row.Tier) return;
+                // Primární klíč: Discord ID (stabilní i při změně nicku)
+                const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : null;
+                if (!discordId) return;
+                const kit     = String(row.Kit).trim();
+                const tier    = String(row.Tier).trim();
+                const date    = row.Date    ? String(row.Date).trim()    : null;
+                const note    = row.Verdict ? String(row.Verdict).trim() : null;
+                const oldTier = row.OldTier ? String(row.OldTier).trim() : null;
+                const icon    = iconMap[kit] || null;
+                if (!icon) return;
+                if (!tierHistory[discordId]) tierHistory[discordId] = {};
+                if (!tierHistory[discordId][icon]) tierHistory[discordId][icon] = [];
+                tierHistory[discordId][icon].push({ tier, date, note, kit, oldTier });
+            });
+        } catch (e) {
+            // History not available – silently skip
+        }
+    }
+
+    function getKitNameFromIcon(icon) {
+        const map = {
+            'kit_icons/cpvp.png':   'Crystal PvP',
+            'kit_icons/axe.png':    'Axe',
+            'kit_icons/sword.png':  'Sword',
+            'kit_icons/uhc.png':    'UHC',
+            'kit_icons/npot.png':   'NPot',
+            'kit_icons/pot.png':    'Pot',
+            'kit_icons/smp.png':    'SMP',
+            'kit_icons/diasmp.png': 'DiaSMP',
+            'kit_icons/mace.png':   'Mace'
+        };
+        return map[icon] || icon;
+    }
+
+    function resolveTierValue(tier) {
+        tier = String(tier).trim();
+        const validNums = ['1','2','3','5','10','16','24','32','48','60','22','29','43','54'];
+        if (validNums.includes(tier)) return tier;
+        const textMap = {
+            'HT1':'60','LT1':'48','HT2':'32','LT2':'24','HT3':'16',
+            'LT3':'10','HT4':'5','LT4':'3','HT5':'2','LT5':'1',
+            'RHT1':'54','RLT1':'43','RHT2':'29','RLT2':'22'
+        };
+        return textMap[tier.toUpperCase()] || null;
+    }
+
+    function escapeXml(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Y index (0 = HT1 best, 9 = LT5 worst) for each tier value
+    const TIER_Y_IDX = {
+        '60':0,'48':1,'32':2,'24':3,'16':4,'10':5,'5':6,'3':7,'2':8,'1':9,
+        '54':0,'43':1,'29':2,'22':3
+    };
+    const TIER_Y_LABELS = [
+        { label:'HT1', val:'60' }, { label:'LT1', val:'48' },
+        { label:'HT2', val:'32' }, { label:'LT2', val:'24' },
+        { label:'HT3', val:'16' }, { label:'LT3', val:'10' },
+        { label:'HT4', val:'5'  }, { label:'LT4', val:'3'  },
+        { label:'HT5', val:'2'  }, { label:'LT5', val:'1'  }
+    ];
+
+    function renderTierJourneyTimeline(container, history) {
+        container.innerHTML = '';
+
+        const SVG_W   = 700;
+        const SVG_H   = 340;
+        const PL      = 56;   // left pad (Y labels)
+        const PR      = 24;   // right pad
+        const PT      = 28;   // top pad
+        const PB      = 44;   // bottom pad (date labels)
+
+        const PLOT_W  = SVG_W - PL - PR;
+        const PLOT_H  = SVG_H - PT - PB;
+        const TIERS   = 10;
+        const SPACING = PLOT_H / (TIERS - 1);
+
+        function yFor(tierValue) {
+            const idx = TIER_Y_IDX[String(tierValue)];
+            return (idx !== undefined) ? PT + idx * SPACING : PT;
+        }
+        function xFor(i, total) {
+            if (total === 1) return PL + PLOT_W / 2;
+            return PL + (i / (total - 1)) * PLOT_W;
+        }
+
+        let svg = '';
+
+        // Horizontal grid lines
+        TIER_Y_LABELS.forEach((tl, i) => {
+            const y = PT + i * SPACING;
+            svg += `<line x1="${PL}" y1="${y}" x2="${PL + PLOT_W}" y2="${y}" stroke="rgba(255,255,255,0.055)" stroke-width="1"/>`;
+        });
+
+        // Y-axis labels (tier names, coloured)
+        TIER_Y_LABELS.forEach((tl, i) => {
+            const y   = PT + i * SPACING;
+            const inf = tierInfo(tl.val);
+            const col = (inf.barvaPozadi === '#23242a') ? inf.barvaTextu : inf.barvaPozadi;
+            svg += `<text x="${PL - 8}" y="${y + 4}" text-anchor="end" font-family="Poppins,sans-serif" font-size="11" font-weight="700" fill="${escapeXml(col)}">${tl.label}</text>`;
+        });
+
+        // X-axis date labels
+        history.forEach((h, i) => {
+            const x = xFor(i, history.length);
+            if (h.date) {
+                svg += `<text x="${x}" y="${SVG_H - 6}" text-anchor="middle" font-family="Poppins,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.38)">${escapeXml(h.date)}</text>`;
+            }
+        });
+
+        // Path connecting points
+        if (history.length > 1) {
+            let d = '';
+            history.forEach((h, i) => {
+                const x = xFor(i, history.length);
+                const y = yFor(h.resolvedTier);
+                d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+            });
+            svg += `<path d="${d}" fill="none" stroke="rgba(238,205,20,0.3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+        }
+
+        // Points
+        history.forEach((h, i) => {
+            const x    = xFor(i, history.length);
+            const y    = yFor(h.resolvedTier);
+            const inf  = tierInfo(String(h.resolvedTier));
+            const orig = getOriginalTierText(String(h.resolvedTier));
+            const isR  = orig.startsWith('R');
+            const dot  = isR ? inf.barvaTextu : inf.barvaPozadi;
+            const isLast = (i === history.length - 1);
+
+            if (isLast) {
+                svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="15" fill="${escapeXml(dot)}" opacity="0.13"/>`;
+            }
+            // Outer ring + fill
+            svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9" fill="${isR ? '#23242a' : escapeXml(dot)}" stroke="${escapeXml(dot)}" stroke-width="2.5"/>`;
+            svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"  fill="${escapeXml(dot)}" opacity="${isLast ? '1' : '0.65'}"/>`;
+            // Invisible hit area (larger circle for easy hovering)
+            svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="17" fill="transparent" class="journey-hit" data-i="${i}" style="cursor:pointer"/>`;
+        });
+
+        const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svgEl.setAttribute('viewBox', `0 0 ${SVG_W} ${SVG_H}`);
+        svgEl.setAttribute('width',   '100%');
+        svgEl.style.maxWidth   = SVG_W + 'px';
+        svgEl.style.display    = 'block';
+        svgEl.style.margin     = '0 auto';
+        svgEl.style.overflow   = 'visible';
+        svgEl.innerHTML = svg;
+        container.appendChild(svgEl);
+
+        // Tooltip element
+        const tip = document.createElement('div');
+        tip.className     = 'journey-tooltip';
+        tip.style.display = 'none';
+        tip.style.position = 'absolute';
+        container.style.position = 'relative';
+        container.appendChild(tip);
+
+        // Hover handlers
+        svgEl.querySelectorAll('.journey-hit').forEach(circle => {
+            circle.addEventListener('mouseenter', function () {
+                const i   = parseInt(this.getAttribute('data-i'));
+                const h   = history[i];
+                const inf = tierInfo(String(h.resolvedTier));
+                const orig = getOriginalTierText(String(h.resolvedTier));
+                const isR  = orig.startsWith('R');
+                const col  = isR ? inf.barvaTextu : inf.barvaPozadi;
+                const isLast = (i === history.length - 1);
+
+                tip.innerHTML =
+                    '<div class="journey-tooltip-tier" style="color:' + col + '">' + escapeXml(orig) + '</div>' +
+                    (h.date ? '<div class="journey-tooltip-date">' + escapeXml(h.date) + '</div>' : '') +
+                    (h.note ? '<div class="journey-tooltip-note">' + escapeXml(h.note) + '</div>' : '') +
+                    (isLast ? '<div class="journey-tooltip-current">Aktuální tier</div>' : '');
+
+                tip.style.display = 'block';
+
+                // Position the tooltip
+                const svgRect  = svgEl.getBoundingClientRect();
+                const wrapRect = container.getBoundingClientRect();
+                const total    = history.length;
+                const ptIndex  = parseFloat(this.getAttribute('cx')) === 0 ? 0 : i;
+                const cx       = parseFloat(this.getAttribute('cx'));
+                const cy       = parseFloat(this.getAttribute('cy'));
+                const scaleX   = svgRect.width  / SVG_W;
+                const scaleY   = svgRect.height / SVG_H;
+                const tipX     = (svgRect.left - wrapRect.left) + cx * scaleX;
+                const tipY     = (svgRect.top  - wrapRect.top)  + cy * scaleY;
+
+                tip.style.left = (tipX - tip.offsetWidth / 2) + 'px';
+                tip.style.top  = (tipY - tip.offsetHeight - 18) + 'px';
+            });
+            circle.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+        });
+    }
+
+    function showTierJourney(playerNick, kitIcon, currentTierValue, discordId) {
+        let raw = (discordId && tierHistory[discordId] && tierHistory[discordId][kitIcon]) || [];
+
+        // Resolve tier values and filter valid
+        let history = raw
+            .map(h => ({ ...h, resolvedTier: resolveTierValue(h.tier) }))
+            .filter(h => h.resolvedTier !== null);
+
+        // If no history data, fall back to current single-point
+        if (history.length === 0) {
+            history = [{
+                resolvedTier: currentTierValue,
+                date: new Date().toLocaleDateString('cs-CZ'),
+                note: null,
+                kit: getKitNameFromIcon(kitIcon)
+            }];
+        }
+
+        const journeyModal = document.getElementById('tier-journey-modal');
+        if (!journeyModal) return;
+
+        journeyModal.querySelector('.tier-journey-kit-icon').src = kitIcon;
+        journeyModal.querySelector('.tier-journey-title').textContent = getKitNameFromIcon(kitIcon) + ' Tier Journey';
+        journeyModal.querySelector('.tier-journey-player').textContent = playerNick;
+
+        renderTierJourneyTimeline(
+            journeyModal.querySelector('.tier-journey-timeline-wrapper'),
+            history
+        );
+
+        journeyModal.style.display = 'flex';
+    }
+
+    // Close journey modal
+    (() => {
+        const jm = document.getElementById('tier-journey-modal');
+        if (!jm) return;
+        jm.querySelector('.tier-journey-close').onclick = () => { jm.style.display = 'none'; };
+        jm.onclick = (e) => { if (e.target === jm) jm.style.display = 'none'; };
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && jm.style.display === 'flex') jm.style.display = 'none';
+        });
+    })();
+
     // MODAL funkce
-    function showPlayerModal({ name, position, score, skin, kitsHtml }) {
+    function showPlayerModal({ name, position, score, skin, kitsHtml, tiers, nick, discordId }) {
         const modal = document.getElementById('player-modal');
         modal.querySelector('.player-modal-name').textContent = name;
 
@@ -420,6 +709,30 @@ document.addEventListener('DOMContentLoaded', async function () {
         modalSkinImg.loading = 'lazy';
         modalSkinImg.decoding = 'async';
         modal.querySelector('.player-modal-tiers').innerHTML = kitsHtml;
+
+        // Wire Tier Journey click on each badge
+        if (tiers && nick) {
+            const sortedTiers = (tiers || [])
+                .filter(t => t.tier && t.tier !== "-")
+                .sort((a, b) => getTierOrder(a.tier) - getTierOrder(b.tier));
+
+            modal.querySelectorAll('.player-modal-tiers .kit-badge').forEach((badge) => {
+                const kitIcon = badge.dataset.kitIcon;
+                if (!kitIcon) return;
+                // Find matching tier by icon
+                const match = sortedTiers.find(t => t.icon === kitIcon);
+                if (!match) return;
+                badge.classList.add('badge-journey-clickable');
+                // Clone to remove old listeners
+                const fresh = badge.cloneNode(true);
+                badge.parentNode.replaceChild(fresh, badge);
+                fresh.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showTierJourney(nick, kitIcon, String(match.tier), discordId);
+                });
+            });
+        }
+
         modal.style.display = 'flex';
     }
 
@@ -577,7 +890,8 @@ document.addEventListener('DOMContentLoaded', async function () {
                         for (let i = 0; i < sortedPlayers.length; i++) {
                             const p = sortedPlayers[i];
                             const currentRank = (p.score === lastScore) ? lastRank : (i + 1);
-                            if (p.nick === nick) {
+                            const isMatch = (player.discordId && p.discordId === player.discordId) || p.nick === player.nick;
+                            if (isMatch) {
                                 position = currentRank;
                                 break;
                             }
@@ -602,7 +916,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                                 style = "background:" + info.barvaPozadi + ";color:#23242a;";
                                 circleColor = info.barvaPozadi;
                             }
-                            return '<span class="kit-badge tooltip">' +
+                            return '<span class="kit-badge tooltip" data-kit-icon="' + t.icon + '">' +
                                 '<span class="kit-icon-circle" style="border-color:' + circleColor + ';">' +
                                 '<img src="' + t.icon + '" alt="" class="kit-icon" loading="lazy">' +
                                 '</span>' +
@@ -621,7 +935,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                             position: position,
                             score: player.score,
                             skin: 'https://mc-heads.net/avatar/' + (player.uuid || player.nick) + '/64',
-                            kitsHtml: kitsHtml
+                            kitsHtml: kitsHtml,
+                            tiers: player.tiers,
+                            nick: player.nick,
+                            discordId: player.discordId || ''
                         });
                         searchInput.value = '';
                         suggestionsDiv.classList.remove('active');

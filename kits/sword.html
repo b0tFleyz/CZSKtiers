@@ -69,7 +69,31 @@
 	<section>
 		<p id="konec">Officiální stránka <a id="mctiers" href="https://mctiers.com">MCTiers</a></p>
 	</section>
+	<!-- Tier Journey Modal -->
+	<div id="tier-journey-modal" class="tier-journey-modal" style="display:none;">
+		<div class="tier-journey-content">
+			<span class="tier-journey-close">&times;</span>
+			<div class="tier-journey-header">
+				<img class="tier-journey-kit-icon" src="" alt="">
+				<div class="tier-journey-header-text">
+					<div class="tier-journey-title"></div>
+					<div class="tier-journey-player"></div>
+				</div>
+			</div>
+			<div class="tier-journey-timeline-wrapper"></div>
+			<div class="tier-journey-legend">
+				<span class="journey-legend-item"><span class="journey-legend-dot" style="background:#FFCF4A;"></span>HT1</span>
+				<span class="journey-legend-item"><span class="journey-legend-dot" style="background:#D5B355;"></span>LT1</span>
+				<span class="journey-legend-item"><span class="journey-legend-dot" style="background:#A4B3C7;"></span>HT2</span>
+				<span class="journey-legend-item"><span class="journey-legend-dot" style="background:#888D95;"></span>LT2</span>
+				<span class="journey-legend-item"><span class="journey-legend-dot" style="background:#8F5931;"></span>HT3</span>
+				<span class="journey-legend-item"><span class="journey-legend-dot" style="background:#B56326;"></span>LT3</span>
+				<span class="journey-legend-item"><span class="journey-legend-dot" style="background:#655B79;"></span>T4/T5</span>
+			</div>
+		</div>
+	</div>
 	<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+	<script src="../js/tierjourney.js"></script>
 	<script src="../js/autocomplete.js"></script>
 	<script src="../js/sword.js"></script>
 </body>

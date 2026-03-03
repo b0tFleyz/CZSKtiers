@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function () {
 			players = rows.filter(row => row.UUID && row.Nick).map(row => ({
 				uuid: row.UUID,
 				nick: row.Nick,
+				discordId: row['Discord ID'] ? String(row['Discord ID']).trim() : '',
 				uhc: normalizeTier(row.UHC)
 			}));
 			renderUhcTable(players);
@@ -62,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function () {
 				div.style.cursor = 'pointer';
 				div.onclick = () => {
 					if (typeof showFullPlayerModal === 'function') {
-						showFullPlayerModal(player.nick);
+						showFullPlayerModal(player.nick, player.discordId);
 					} else if (typeof showKitPlayerModal === 'function') {
 						showKitPlayerModal(player);
 					}
@@ -77,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function () {
 				div.style.cursor = 'pointer';
 				div.onclick = () => {
 					if (typeof showFullPlayerModal === 'function') {
-						showFullPlayerModal(player.nick);
+						showFullPlayerModal(player.nick, player.discordId);
 					} else if (typeof showKitPlayerModal === 'function') {
 						showKitPlayerModal(player);
 					}

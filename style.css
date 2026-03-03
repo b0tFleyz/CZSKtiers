@@ -2890,3 +2890,223 @@ tbody tr:nth-child(3) td:nth-child(2) {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(238, 205, 20, 0.4);
 }
+
+/* ========== TIER JOURNEY ========== */
+
+/* Hint below player modal tiers */
+.player-modal-journey-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 14px;
+    font-size: 0.78em;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.3px;
+    transition: color 0.2s;
+}
+.journey-hint-icon {
+    color: rgba(238,205,20,0.45);
+    display: flex;
+    align-items: center;
+}
+
+/* Make modal kit badges clickable */
+.player-modal-tiers .kit-badge.badge-journey-clickable {
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+.player-modal-tiers .kit-badge.badge-journey-clickable:hover {
+    transform: scale(1.1) translateY(-2px);
+    filter: brightness(1.2);
+    box-shadow: 0 4px 16px rgba(238,205,20,0.25);
+}
+
+/* ---- Tier Journey Modal Overlay ---- */
+.tier-journey-modal {
+    position: fixed;
+    z-index: 2000;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.82);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    animation: tjFadeIn 0.22s ease;
+}
+@keyframes tjFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.tier-journey-modal[style*="display: flex"] {
+    display: flex;
+}
+
+.tier-journey-content {
+    background: linear-gradient(145deg, #1e1f26 0%, #23242a 100%);
+    border-radius: 22px;
+    padding: 36px 40px 28px 40px;
+    min-width: 380px;
+    max-width: 780px;
+    width: 92vw;
+    color: #fff;
+    position: relative;
+    box-shadow: 0 12px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(238,205,20,0.1);
+    animation: tjSlideUp 0.26s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes tjSlideUp {
+    from { opacity: 0; transform: translateY(30px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.tier-journey-close {
+    position: absolute;
+    right: 18px; top: 14px;
+    font-size: 2em;
+    cursor: pointer;
+    color: #fff;
+    opacity: 0.55;
+    transition: opacity 0.2s, transform 0.2s;
+    line-height: 1;
+    z-index: 1;
+}
+.tier-journey-close:hover { opacity: 1; transform: rotate(90deg); }
+
+.tier-journey-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+}
+.tier-journey-kit-icon {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    filter: drop-shadow(0 2px 6px rgba(238,205,20,0.35));
+}
+.tier-journey-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.tier-journey-title {
+    font-size: 1.45em;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    background: linear-gradient(90deg, #ffe066, #eecd14);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.tier-journey-player {
+    font-size: 0.92em;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.3px;
+}
+
+/* ---- Timeline SVG wrapper ---- */
+.tier-journey-timeline-wrapper {
+    position: relative;
+    width: 100%;
+    min-height: 180px;
+    overflow: visible;
+}
+.tier-journey-timeline-wrapper svg {
+    overflow: visible;
+}
+
+/* ---- Tooltip ---- */
+.journey-tooltip {
+    position: absolute;
+    background: #18191f;
+    border: 1px solid rgba(238,205,20,0.25);
+    border-radius: 10px;
+    padding: 10px 14px;
+    pointer-events: none;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+    z-index: 10;
+    min-width: 110px;
+    text-align: center;
+    transform: translateX(-50%);
+    transition: opacity 0.12s;
+}
+.journey-tooltip-tier {
+    font-size: 1.25em;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+.journey-tooltip-date {
+    font-size: 0.78em;
+    color: rgba(255,255,255,0.5);
+    margin-top: 4px;
+}
+.journey-tooltip-note {
+    font-size: 0.8em;
+    color: rgba(255,255,255,0.75);
+    margin-top: 5px;
+    font-style: italic;
+    max-width: 160px;
+    word-wrap: break-word;
+}
+.journey-tooltip-current {
+    margin-top: 6px;
+    font-size: 0.72em;
+    background: rgba(238,205,20,0.18);
+    color: #eecd14;
+    border-radius: 5px;
+    padding: 2px 8px;
+    display: inline-block;
+    letter-spacing: 0.5px;
+}
+
+/* ---- Legend ---- */
+.tier-journey-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    justify-content: center;
+}
+.journey-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78em;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.3px;
+}
+.journey-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+/* ---- No-data state ---- */
+.tier-journey-no-data {
+    text-align: center;
+    color: rgba(255,255,255,0.4);
+    padding: 30px 0;
+    font-size: 0.95em;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 600px) {
+    .tier-journey-content {
+        padding: 28px 16px 20px 16px;
+        min-width: unset;
+        width: 96vw;
+        border-radius: 16px;
+    }
+    .tier-journey-title {
+        font-size: 1.15em;
+    }
+    .tier-journey-legend {
+        gap: 8px 12px;
+    }
+}

@@ -45,7 +45,7 @@ function initAutocomplete(players) {
         // Vygeneruj návrhy
         suggestionsDiv.innerHTML = matches.map((player, index) => {
             return `
-                <div class="search-suggestion-item" data-index="${index}" data-nick="${player.nick}">
+                <div class="search-suggestion-item" data-index="${index}" data-nick="${player.nick}" data-discord-id="${player.discordId || ''}">
                     <img src="https://mc-heads.net/avatar/${player.uuid || player.nick}/36" alt="${player.nick}" class="player-avatar">
                     <div class="player-details">
                         <div class="name">${player.nick}</div>
@@ -59,7 +59,8 @@ function initAutocomplete(players) {
         suggestionsDiv.querySelectorAll('.search-suggestion-item').forEach(item => {
             item.addEventListener('click', function() {
                 const nick = this.dataset.nick;
-                showFullPlayerModal(nick);
+                const discordId = this.dataset.discordId || '';
+                showFullPlayerModal(nick, discordId);
                 searchInput.value = '';
                 suggestionsDiv.classList.remove('active');
             });
@@ -134,7 +135,7 @@ function loadFullPlayerData() {
                 { key: "Axe", icon: "kit_icons/axe.png" },
                 { key: "Sword", icon: "kit_icons/sword.png" },
                 { key: "UHC", icon: "kit_icons/uhc.png" },
-                { key: "NPot", icon: "kit_icons/npot.png" },
+                { key: "Npot", icon: "kit_icons/npot.png" },
                 { key: "Pot", icon: "kit_icons/pot.png" },
                 { key: "SMP", icon: "kit_icons/smp.png" },
                 { key: "DiaSMP", icon: "kit_icons/diasmp.png" },
@@ -159,6 +160,7 @@ function loadFullPlayerData() {
                 return {
                     uuid: row.UUID,
                     nick: row.Nick,
+                    discordId: row['Discord ID'] ? String(row['Discord ID']).trim() : '',
                     score: overallScore,
                     tiers: tiers
                 };
@@ -167,12 +169,12 @@ function loadFullPlayerData() {
         .catch(err => console.error('Error loading full player data:', err));
 }
 
-function showFullPlayerModal(nick) {
+function showFullPlayerModal(nick, discordId) {
     const modal = document.getElementById('player-modal');
     if (!modal) return;
     
-    if (!nick) {
-        console.error('showFullPlayerModal called without nick parameter');
+    if (!nick && !discordId) {
+        console.error('showFullPlayerModal called without nick or discordId');
         return;
     }
     
@@ -181,9 +183,11 @@ function showFullPlayerModal(nick) {
         return;
     }
     
-    const player = fullPlayerData.find(p => p.nick === nick);
+    // Lookup by Discord ID first (stable), then fall back to nick
+    const player = (discordId && fullPlayerData.find(p => p.discordId === discordId))
+        || fullPlayerData.find(p => p.nick === nick);
     if (!player) {
-        console.error('Player not found in full data:', nick);
+        console.error('Player not found in full data:', nick, discordId);
         return;
     }
     
@@ -196,7 +200,8 @@ function showFullPlayerModal(nick) {
     for (let i = 0; i < sortedPlayers.length; i++) {
         const p = sortedPlayers[i];
         const currentRank = (p.score === lastScore) ? lastRank : (i + 1);
-        if (p.nick === nick) {
+        const isMatch = (player.discordId && p.discordId === player.discordId) || p.nick === player.nick;
+        if (isMatch) {
             position = currentRank;
             break;
         }
@@ -248,7 +253,7 @@ function showFullPlayerModal(nick) {
             circleColor = info.color;
         }
         
-        return '<span class="kit-badge tooltip">' +
+        return '<span class="kit-badge tooltip" data-kit-icon="' + t.icon + '" data-kit-tier="' + t.tier + '">' +
             '<span class="kit-icon-circle" style="border-color:' + circleColor + ';">' +
             '<img src="../' + t.icon + '" alt="" class="kit-icon" loading="lazy">' +
             '</span>' +
@@ -265,6 +270,16 @@ function showFullPlayerModal(nick) {
     const tiersDiv = modal.querySelector('.player-modal-tiers');
     if (tiersDiv) {
         tiersDiv.innerHTML = kitsHtml;
+        // Wire Tier Journey click on kit badges (pokud je tierjourney.js načten)
+        if (typeof window.showTierJourney === 'function') {
+            tiersDiv.querySelectorAll('.kit-badge[data-kit-icon]').forEach(badge => {
+                badge.classList.add('badge-journey-clickable');
+                badge.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    window.showTierJourney(player.nick, badge.dataset.kitIcon, badge.dataset.kitTier, player.discordId);
+                });
+            });
+        }
     }
     
     modal.style.display = 'flex';
@@ -313,7 +328,7 @@ function getTierInfoForModal(tier) {
 function showKitPlayerModal(player) {
     // Pro zpětnou kompatibilitu - použij full modal pokud jsou data k dispozici
     if (fullPlayerData.length > 0) {
-        showFullPlayerModal(player.nick);
+        showFullPlayerModal(player.nick, player.discordId || '');
     } else {
         // Fallback na jednoduchý modal
         const modal = document.getElementById('player-modal');
