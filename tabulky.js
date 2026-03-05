@@ -358,6 +358,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     
                     showPlayerModal({
                         name: fullPlayer.nick,
+                        nick: fullPlayer.nick,
+                        discordId: fullPlayer.discordId || '',
                         position: position,
                         score: fullPlayer.score,
                         skin: 'https://mc-heads.net/avatar/' + escapedNick + '/64',
@@ -506,6 +508,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     
                     showPlayerModal({
                         name: player.nick,
+                        nick: player.nick,
+                        discordId: player.discordId || '',
                         position: position,
                         score: player.score,
                         skin: 'https://mc-heads.net/avatar/' + escapedNick + '/64',
@@ -598,6 +602,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (score) score.textContent = data.score + ' bodů';
         if (tiers) tiers.innerHTML = data.kitsHtml;
+        
+        // Wire Tier Journey click on kit badges
+        if (typeof window.showTierJourney === 'function' && tiers && data.nick) {
+            tiers.querySelectorAll('.kit-badge[data-kit-icon]').forEach(badge => {
+                badge.classList.add('badge-journey-clickable');
+                badge.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    window.showTierJourney(data.nick, badge.dataset.kitIcon, badge.dataset.kitTier || '', data.discordId || '');
+                });
+            });
+        }
         
         modal.style.display = 'flex';
         
