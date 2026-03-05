@@ -10,9 +10,68 @@ document.addEventListener('DOMContentLoaded', async function () {
         "54", "43", "29", "22"
     ];
 
+    // Points awarded for peak tier (for players not yet retired)
+    // HT3 peak = 14, LT2+ uses same bonus as the retire score
+    const PEAK_TIER_SCORE = {
+        'HT3': 14, 'LT2': 22, 'HT2': 29, 'LT1': 43, 'HT1': 54
+    };
+
     function getTierOrder(tier) {
         const idx = TIER_ORDER.indexOf(String(tier));
         return idx === -1 ? 999 : idx;
+    }
+
+    // Returns the highest regular (non-retire) tier text from history for a player/kit
+    function getPeakTierTextFromHistory(discordId, kitIcon) {
+        const history = (tierHistory[discordId] || {})[kitIcon] || [];
+        let bestOrder = 999;
+        let bestTierText = null;
+        for (const entry of history) {
+            for (const tierText of [entry.tier, entry.oldTier]) {
+                if (!tierText) continue;
+                const t = String(tierText).trim();
+                if (!t || t.startsWith('R')) continue;
+                const tierVal = resolveTierValue(t);
+                if (!tierVal) continue;
+                const order = getTierOrder(tierVal);
+                if (order < bestOrder) {
+                    bestOrder = order;
+                    bestTierText = t;
+                }
+            }
+        }
+        return bestTierText; // e.g. 'HT2', 'LT1', or null
+    }
+
+    // Extracts peak tier info from TierHistory worksheet (already in-memory)
+    function processTierHistoryFromSheet(worksheet) {
+        const iconMap = {
+            'Crystal': 'kit_icons/cpvp.png',
+            'Axe': 'kit_icons/axe.png',
+            'Sword': 'kit_icons/sword.png',
+            'UHC': 'kit_icons/uhc.png',
+            'Npot': 'kit_icons/npot.png', 'NPot': 'kit_icons/npot.png',
+            'Pot': 'kit_icons/pot.png',
+            'SMP': 'kit_icons/smp.png',
+            'DiaSMP': 'kit_icons/diasmp.png',
+            'Mace': 'kit_icons/mace.png'
+        };
+        const rows = XLSX.utils.sheet_to_json(worksheet);
+        rows.forEach(row => {
+            if (!row.Kit || !row.Tier) return;
+            const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : null;
+            if (!discordId) return;
+            const kit     = String(row.Kit).trim();
+            const tier    = String(row.Tier).trim();
+            const date    = row.Date    ? String(row.Date).trim()    : null;
+            const note    = row.Verdict ? String(row.Verdict).trim() : null;
+            const oldTier = row.OldTier ? String(row.OldTier).trim() : null;
+            const icon    = iconMap[kit] || null;
+            if (!icon) return;
+            if (!tierHistory[discordId]) tierHistory[discordId] = {};
+            if (!tierHistory[discordId][icon]) tierHistory[discordId][icon] = [];
+            tierHistory[discordId][icon].push({ tier, date, note, kit, oldTier });
+        });
     }
 
     const kits = [
@@ -74,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     </span>
     <span class="tooltiptext">
         <strong>` + origText + `</strong><br>
-        ` + t.tier + ` points
+        ` + (t.peakTierText ? PEAK_TIER_SCORE[t.peakTierText] : t.tier) + ` pts` + (t.peakTierText ? `<br><span style="font-size:0.85em;opacity:0.7;">Peak: ` + t.peakTierText + `</span>` : '') + `
     </span>
 </span>
             `,
@@ -141,11 +200,19 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     let overallData = [];
     let discordIdToNick = {}; // Discord ID → Nick, built from spreadsheet data
+    let tierHistory = {}; // keyed by discordId → kitIcon → [{tier, date, note, kit, oldTier}]
     // Načti overall jako pole objektů a vygeneruj karty
     async function nactiOverallExcel(url) {
         const response = await fetch(url);
         const data = await response.arrayBuffer();
         const workbook = XLSX.read(data, { type: 'array' });
+
+        // Process TierHistory from the same workbook so peak tiers are available immediately
+        const histSheetName = workbook.SheetNames.find(n => n === 'TierHistory');
+        if (histSheetName) {
+            processTierHistoryFromSheet(workbook.Sheets[histSheetName]);
+        }
+
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(worksheet);
 
@@ -157,6 +224,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         });
 
         overallData = rows.map(row => {
+            const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : '';
             const tiers = [
                 { tier: row.Crystal, icon: "kit_icons/cpvp.png" },
                 { tier: row.Axe, icon: "kit_icons/axe.png" },
@@ -168,16 +236,23 @@ document.addEventListener('DOMContentLoaded', async function () {
                 { tier: row.DiaSMP, icon: "kit_icons/diasmp.png" },
                 { tier: row.Mace, icon: "kit_icons/mace.png" }
             ];
-            // Součet všech tierů kromě neotestovaných
+            // Score = max(current tier, peak tier bonus) per kit
             let overallScore = 0;
             tiers.forEach(t => {
                 const val = parseInt(t.tier);
-                if (!isNaN(val)) overallScore += val;
+                if (!isNaN(val)) {
+                    const peakText = discordId ? getPeakTierTextFromHistory(discordId, t.icon) : null;
+                    const peakScore = peakText ? (PEAK_TIER_SCORE[peakText] || 0) : 0;
+                    const effectiveScore = Math.max(val, peakScore);
+                    overallScore += effectiveScore;
+                    // Only store peakTierText if it actually boosts the score
+                    t.peakTierText = (peakScore > val) ? peakText : null;
+                }
             });
             return {
                 uuid: row.UUID,
                 nick: row.Nick,
-                discordId: row['Discord ID'] ? String(row['Discord ID']).trim() : '',
+                discordId,
                 score: overallScore,
                 tiers: tiers
             };
@@ -243,8 +318,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         await nactiOverallExcel('https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx');
         // Skryj loading indicator po úspěšném načtení
         if (loadingIndicator) loadingIndicator.style.display = 'none';
-        // Načti tier history z TierHistory listu stejného spreadsheetu – best-effort, tiché selhání
-        nactiTierHistory('https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx');
+        // TierHistory is already processed inside nactiOverallExcel from the same workbook
     } catch (error) {
         console.error('Error loading data:', error);
         // Zobraz error message
@@ -319,7 +393,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                     circleColor = info.barvaPozadi;
                 }
                 return `
-                    <span class="kit-badge tooltip" data-kit-icon="${t.icon}">
+                    <span class="kit-badge tooltip" data-kit-icon="${t.icon}" style="--tier-color:${origText.startsWith('R') ? info.barvaTextu : info.barvaPozadi};">
                         <span class="kit-icon-circle" style="border-color:${circleColor};">
                             <img src="${t.icon}" alt="" class="kit-icon" loading="lazy">
                         </span>
@@ -328,7 +402,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                         </span>
                         <span class="tooltiptext">
                             <strong>${origText}</strong><br>
-                            ${t.tier} points
+                            ${t.peakTierText ? PEAK_TIER_SCORE[t.peakTierText] : t.tier} pts${t.peakTierText ? `<br><span style="font-size:0.85em;opacity:0.7;">Peak: ${t.peakTierText}</span>` : ''}
                         </span>
                     </span>
                 `;
@@ -415,9 +489,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     // ========== TIER JOURNEY ==========
-
-    // Storage for tier history (keyed by nick)
-    let tierHistory = {};
 
     async function nactiTierHistory(url) {
         try {
@@ -916,7 +987,9 @@ document.addEventListener('DOMContentLoaded', async function () {
                                 style = "background:" + info.barvaPozadi + ";color:#23242a;";
                                 circleColor = info.barvaPozadi;
                             }
-                            return '<span class="kit-badge tooltip" data-kit-icon="' + t.icon + '">' +
+                            const ptsDisplay = t.peakTierText ? PEAK_TIER_SCORE[t.peakTierText] : t.tier;
+                            const peakExtra = t.peakTierText ? '<br><span style="font-size:0.85em;opacity:0.7;">Peak: ' + t.peakTierText + '</span>' : '';
+                            return '<span class="kit-badge tooltip" data-kit-icon="' + t.icon + '" style="--tier-color:' + (origText.startsWith('R') ? info.barvaTextu : info.barvaPozadi) + ';">' +
                                 '<span class="kit-icon-circle" style="border-color:' + circleColor + ';">' +
                                 '<img src="' + t.icon + '" alt="" class="kit-icon" loading="lazy">' +
                                 '</span>' +
@@ -925,7 +998,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                                 '</span>' +
                                 '<span class="tooltiptext">' +
                                 '<strong>' + origText + '</strong><br>' +
-                                t.tier + ' points' +
+                                ptsDisplay + ' pts' + peakExtra +
                                 '</span>' +
                                 '</span>';
                         }).join('');

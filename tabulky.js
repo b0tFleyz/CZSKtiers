@@ -10,6 +10,73 @@ function getTierOrder(tier) {
     return idx === -1 ? 999 : idx;
 }
 
+let tierHistory = {};
+
+const PEAK_TIER_SCORE = {
+    'HT3': 14, 'LT2': 22, 'HT2': 29, 'LT1': 43, 'HT1': 54
+};
+
+function resolveTierValue(tier) {
+    tier = String(tier).trim();
+    const validNums = ['1','2','3','5','10','16','24','32','48','60','22','29','43','54'];
+    if (validNums.includes(tier)) return tier;
+    const textMap = {
+        'HT1':'60','LT1':'48','HT2':'32','LT2':'24','HT3':'16',
+        'LT3':'10','HT4':'5','LT4':'3','HT5':'2','LT5':'1',
+        'RHT1':'54','RLT1':'43','RHT2':'29','RLT2':'22'
+    };
+    return textMap[tier.toUpperCase()] || null;
+}
+
+function getPeakTierTextFromHistory(discordId, kitIcon) {
+    const history = (tierHistory[discordId] || {})[kitIcon] || [];
+    let bestOrder = 999;
+    let bestTierText = null;
+    for (const entry of history) {
+        for (const tierText of [entry.tier, entry.oldTier]) {
+            if (!tierText) continue;
+            const t = String(tierText).trim();
+            if (!t || t.startsWith('R')) continue;
+            const tierVal = resolveTierValue(t);
+            if (!tierVal) continue;
+            const order = getTierOrder(tierVal);
+            if (order < bestOrder) {
+                bestOrder = order;
+                bestTierText = t;
+            }
+        }
+    }
+    return bestTierText;
+}
+
+function processTierHistoryFromSheet(worksheet) {
+    const iconMap = {
+        'Crystal': 'kit_icons/cpvp.png',
+        'Axe': 'kit_icons/axe.png',
+        'Sword': 'kit_icons/sword.png',
+        'UHC': 'kit_icons/uhc.png',
+        'Npot': 'kit_icons/npot.png', 'NPot': 'kit_icons/npot.png',
+        'Pot': 'kit_icons/pot.png',
+        'SMP': 'kit_icons/smp.png',
+        'DiaSMP': 'kit_icons/diasmp.png',
+        'Mace': 'kit_icons/mace.png'
+    };
+    const rows = XLSX.utils.sheet_to_json(worksheet);
+    rows.forEach(row => {
+        if (!row.Kit || !row.Tier) return;
+        const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : null;
+        if (!discordId) return;
+        const kit     = String(row.Kit).trim();
+        const tier    = String(row.Tier).trim();
+        const oldTier = row.OldTier ? String(row.OldTier).trim() : null;
+        const icon    = iconMap[kit] || null;
+        if (!icon) return;
+        if (!tierHistory[discordId]) tierHistory[discordId] = {};
+        if (!tierHistory[discordId][icon]) tierHistory[discordId][icon] = [];
+        tierHistory[discordId][icon].push({ tier, kit, oldTier });
+    });
+}
+
 const kits = [
     { key: "Crystal", icon: "kit_icons/cpvp.png" },
     { key: "Axe", icon: "kit_icons/axe.png" },
@@ -77,10 +144,19 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .then(data => {
             const workbook = XLSX.read(data, { type: 'array' });
+
+            // Process TierHistory sheet for peak tier data
+            tierHistory = {};
+            const histSheetName = workbook.SheetNames.find(n => n === 'TierHistory');
+            if (histSheetName) {
+                processTierHistoryFromSheet(workbook.Sheets[histSheetName]);
+            }
+
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(worksheet);
             
             players = rows.map(row => {
+                const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : '';
                 const tiers = [
                     { tier: row.Crystal, icon: "kit_icons/cpvp.png" },
                     { tier: row.Axe, icon: "kit_icons/axe.png" },
@@ -95,11 +171,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 let overallScore = 0;
                 tiers.forEach(t => {
                     const val = parseInt(t.tier);
-                    if (!isNaN(val)) overallScore += val;
+                    if (!isNaN(val)) {
+                        const peakText = discordId ? getPeakTierTextFromHistory(discordId, t.icon) : null;
+                        const peakScore = peakText ? (PEAK_TIER_SCORE[peakText] || 0) : 0;
+                        overallScore += Math.max(val, peakScore);
+                        t.peakTierText = (peakScore > val) ? peakText : null;
+                    }
                 });
                 return {
                     uuid: row.UUID,
                     nick: row.Nick,
+                    discordId,
                     score: overallScore,
                     tiers: tiers
                 };
@@ -258,7 +340,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             style = "background:" + info.barvaPozadi + ";color:#23242a;";
                             circleColor = info.barvaPozadi;
                         }
-                        return '<span class="kit-badge tooltip">' +
+                        const ptsDisplay = t.peakTierText ? PEAK_TIER_SCORE[t.peakTierText] : t.tier;
+                        const peakExtra = t.peakTierText ? '<br><span style="font-size:0.85em;opacity:0.7;">Peak: ' + t.peakTierText + '</span>' : '';
+                        return '<span class="kit-badge tooltip" data-kit-icon="' + t.icon + '" style="--tier-color:' + (origText.startsWith('R') ? info.barvaTextu : info.barvaPozadi) + ';">' +
                             '<span class="kit-icon-circle" style="border-color:' + circleColor + ';">' +
                             '<img src="' + t.icon + '" alt="" class="kit-icon" loading="lazy">' +
                             '</span>' +
@@ -267,7 +351,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             '</span>' +
                             '<span class="tooltiptext">' +
                             '<strong>' + origText + '</strong><br>' +
-                            t.tier + ' points' +
+                            ptsDisplay + ' pts' + peakExtra +
                             '</span>' +
                             '</span>';
                     }).join('');
@@ -404,7 +488,9 @@ document.addEventListener('DOMContentLoaded', function () {
                             style = "background:" + info.barvaPozadi + ";color:#23242a;";
                             circleColor = info.barvaPozadi;
                         }
-                        return '<span class="kit-badge tooltip">' +
+                        const ptsDisplay = t.peakTierText ? PEAK_TIER_SCORE[t.peakTierText] : t.tier;
+                        const peakExtra = t.peakTierText ? '<br><span style="font-size:0.85em;opacity:0.7;">Peak: ' + t.peakTierText + '</span>' : '';
+                        return '<span class="kit-badge tooltip" data-kit-icon="' + t.icon + '" style="--tier-color:' + (origText.startsWith('R') ? info.barvaTextu : info.barvaPozadi) + ';">' +
                             '<span class="kit-icon-circle" style="border-color:' + circleColor + ';">' +
                             '<img src="' + t.icon + '" alt="" class="kit-icon" loading="lazy">' +
                             '</span>' +
@@ -413,7 +499,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             '</span>' +
                             '<span class="tooltiptext">' +
                             '<strong>' + origText + '</strong><br>' +
-                            t.tier + ' points' +
+                            ptsDisplay + ' pts' + peakExtra +
                             '</span>' +
                             '</span>';
                     }).join('');

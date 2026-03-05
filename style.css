@@ -1437,14 +1437,16 @@ tbody tr:nth-child(3) td:nth-child(2) {
 /* Tooltip */
 .tooltip .tooltiptext {
     visibility: hidden;
-    width: 90px;
+    min-width: 90px;
+    width: max-content;
+    max-width: 150px;
     background-color: #23242a;
     color: #fff;
     text-align: center;
     border-radius: 8px;
-    padding: 8px 0;
+    padding: 8px 6px;
     position: absolute;
-    z-index: 10;
+    z-index: 100;
     bottom: 120%;
     left: 50%;
     transform: translateX(-50%);
@@ -1667,22 +1669,23 @@ tbody tr:nth-child(3) td:nth-child(2) {
     border: 1px solid rgba(238, 205, 20, 0.08);
     cursor: pointer;
     position: relative;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .player-card::before {
     content: '';
     position: absolute;
     top: 0;
-    left: -100%;
+    left: 0;
     width: 100%;
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(238, 205, 20, 0.1), transparent);
-    transition: left 0.6s;
+    transition: opacity 0.6s;
+    opacity: 0;
 }
 
 .player-card:hover::before {
-    left: 100%;
+    opacity: 1;
 }
 
 .player-card:hover {
@@ -2078,14 +2081,16 @@ tbody tr:nth-child(3) td:nth-child(2) {
 
 .tooltip .tooltiptext {
     visibility: hidden;
-    width: 90px;
+    min-width: 90px;
+    width: max-content;
+    max-width: 150px;
     background-color: #23242a;
     color: #fff;
     text-align: center;
     border-radius: 8px;
-    padding: 8px 0;
+    padding: 8px 6px;
     position: absolute;
-    z-index: 10;
+    z-index: 100;
     bottom: 120%;
     left: 50%;
     transform: translateX(-50%);
@@ -2914,12 +2919,14 @@ tbody tr:nth-child(3) td:nth-child(2) {
 /* Make modal kit badges clickable */
 .player-modal-tiers .kit-badge.badge-journey-clickable {
     cursor: pointer;
-    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+    transition: transform 0.18s ease, filter 0.18s ease;
 }
 .player-modal-tiers .kit-badge.badge-journey-clickable:hover {
     transform: scale(1.1) translateY(-2px);
-    filter: brightness(1.2);
-    box-shadow: 0 4px 16px rgba(238,205,20,0.25);
+    filter: brightness(1.1);
+}
+.player-modal-tiers .kit-badge.badge-journey-clickable:hover .kit-icon-circle {
+    box-shadow: 0 0 14px 6px var(--tier-color, rgba(238,205,20,0.4));
 }
 
 /* ---- Tier Journey Modal Overlay ---- */

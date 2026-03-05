@@ -1,7 +1,45 @@
-// Univerzální autocomplete funkcionalita pro vyhledávání hráčů
 let allPlayers = [];
 let currentSuggestionIndex = -1;
 let fullPlayerData = []; // Plná data pro modal
+let kitPageTierHistory = {}; // discordId → kitIcon → [{tier, oldTier}]
+
+const PEAK_TIER_SCORE_AUTOCOMPLETE = {
+    'HT3': 14, 'LT2': 22, 'HT2': 29, 'LT1': 43, 'HT1': 54
+};
+
+function resolveTierValueAC(tier) {
+    tier = String(tier).trim();
+    const validNums = ['1','2','3','5','10','16','24','32','48','60','22','29','43','54'];
+    if (validNums.includes(tier)) return tier;
+    const textMap = {
+        'HT1':'60','LT1':'48','HT2':'32','LT2':'24','HT3':'16',
+        'LT3':'10','HT4':'5','LT4':'3','HT5':'2','LT5':'1',
+        'RHT1':'54','RLT1':'43','RHT2':'29','RLT2':'22'
+    };
+    return textMap[tier.toUpperCase()] || null;
+}
+
+function getPeakTierTextAC(discordId, kitIcon) {
+    const history = (kitPageTierHistory[discordId] || {})[kitIcon] || [];
+    const TIER_ORDER_AC = ['60','48','32','24','16','10','5','3','2','1','54','43','29','22'];
+    let bestOrder = 999;
+    let bestTierText = null;
+    for (const entry of history) {
+        for (const tierText of [entry.tier, entry.oldTier]) {
+            if (!tierText) continue;
+            const t = String(tierText).trim();
+            if (!t || t.startsWith('R')) continue;
+            const tierVal = resolveTierValueAC(t);
+            if (!tierVal) continue;
+            const order = TIER_ORDER_AC.indexOf(tierVal);
+            if (order !== -1 && order < bestOrder) {
+                bestOrder = order;
+                bestTierText = t;
+            }
+        }
+    }
+    return bestTierText;
+}
 
 function initAutocomplete(players) {
     allPlayers = players;
@@ -127,6 +165,33 @@ function loadFullPlayerData() {
         .then(res => res.arrayBuffer())
         .then(data => {
             const workbook = XLSX.read(data, { type: 'array' });
+
+            // Load TierHistory for peak tier data
+            kitPageTierHistory = {};
+            const iconMap = {
+                'Crystal': 'kit_icons/cpvp.png', 'Axe': 'kit_icons/axe.png',
+                'Sword': 'kit_icons/sword.png', 'UHC': 'kit_icons/uhc.png',
+                'Npot': 'kit_icons/npot.png', 'NPot': 'kit_icons/npot.png',
+                'Pot': 'kit_icons/pot.png', 'SMP': 'kit_icons/smp.png',
+                'DiaSMP': 'kit_icons/diasmp.png', 'Mace': 'kit_icons/mace.png'
+            };
+            const histSheetName = workbook.SheetNames.find(n => n === 'TierHistory');
+            if (histSheetName) {
+                const histRows = XLSX.utils.sheet_to_json(workbook.Sheets[histSheetName]);
+                histRows.forEach(row => {
+                    if (!row.Kit || !row.Tier) return;
+                    const did = row['Discord ID'] ? String(row['Discord ID']).trim() : null;
+                    if (!did) return;
+                    const icon = iconMap[String(row.Kit).trim()] || null;
+                    if (!icon) return;
+                    const tier = String(row.Tier).trim();
+                    const oldTier = row.OldTier ? String(row.OldTier).trim() : null;
+                    if (!kitPageTierHistory[did]) kitPageTierHistory[did] = {};
+                    if (!kitPageTierHistory[did][icon]) kitPageTierHistory[did][icon] = [];
+                    kitPageTierHistory[did][icon].push({ tier, oldTier });
+                });
+            }
+
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(worksheet);
             
@@ -154,7 +219,13 @@ function loadFullPlayerData() {
                 let overallScore = 0;
                 tiers.forEach(t => {
                     const num = parseFloat(t.tier);
-                    if (!isNaN(num)) overallScore += num;
+                    if (!isNaN(num)) {
+                        const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : '';
+                        const peakText = discordId ? getPeakTierTextAC(discordId, t.icon) : null;
+                        const peakScore = peakText ? (PEAK_TIER_SCORE_AUTOCOMPLETE[peakText] || 0) : 0;
+                        overallScore += Math.max(num, peakScore);
+                        t.peakTierText = (peakScore > num) ? peakText : null;
+                    }
                 });
                 
                 return {
@@ -253,7 +324,7 @@ function showFullPlayerModal(nick, discordId) {
             circleColor = info.color;
         }
         
-        return '<span class="kit-badge tooltip" data-kit-icon="' + t.icon + '" data-kit-tier="' + t.tier + '">' +
+        return '<span class="kit-badge tooltip" style="--tier-color:' + info.color + ';" data-kit-icon="' + t.icon + '" data-kit-tier="' + t.tier + '">' +
             '<span class="kit-icon-circle" style="border-color:' + circleColor + ';">' +
             '<img src="../' + t.icon + '" alt="" class="kit-icon" loading="lazy">' +
             '</span>' +
@@ -262,7 +333,8 @@ function showFullPlayerModal(nick, discordId) {
             '</span>' +
             '<span class="tooltiptext">' +
             '<strong>' + origText + '</strong><br>' +
-            t.tier + ' points' +
+            (t.peakTierText ? PEAK_TIER_SCORE_AUTOCOMPLETE[t.peakTierText] : t.tier) + ' pts' +
+            (t.peakTierText ? '<br><span style="font-size:0.85em;opacity:0.7;">Peak: ' + t.peakTierText + '</span>' : '') +
             '</span>' +
             '</span>';
     }).join('');
