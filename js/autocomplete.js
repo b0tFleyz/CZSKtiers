@@ -19,26 +19,56 @@ function resolveTierValueAC(tier) {
     return textMap[tier.toUpperCase()] || null;
 }
 
+// Parses Czech locale date string "D. M. YYYY" or "D.M.YYYY" into a timestamp
+function parseCzechDateAC(str) {
+    if (!str) return null;
+    const m = str.match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/);
+    if (!m) return null;
+    return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1])).getTime();
+}
+
+// Returns the highest peak tier confirmed by holding it long enough:
+// HT3 = 30 days, LT2/HT2 = 60 days, LT1/HT1 = 90 days
 function getPeakTierTextAC(discordId, kitIcon) {
     const history = (kitPageTierHistory[discordId] || {})[kitIcon] || [];
+    if (history.length === 0) return null;
     const TIER_ORDER_AC = ['60','48','32','24','16','10','5','3','2','1','54','43','29','22'];
-    let bestOrder = 999;
-    let bestTierText = null;
-    for (const entry of history) {
-        for (const tierText of [entry.tier, entry.oldTier]) {
-            if (!tierText) continue;
-            const t = String(tierText).trim();
-            if (!t || t.startsWith('R')) continue;
-            const tierVal = resolveTierValueAC(t);
-            if (!tierVal) continue;
-            const order = TIER_ORDER_AC.indexOf(tierVal);
-            if (order !== -1 && order < bestOrder) {
-                bestOrder = order;
-                bestTierText = t;
+    const PEAK_REQUIRED_DAYS_AC = { 'HT3': 30, 'LT2': 60, 'HT2': 60, 'LT1': 90, 'HT1': 90 };
+    const sorted = history
+        .map(e => ({ ...e, ts: parseCzechDateAC(e.date) }))
+        .sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    let confirmedBestOrder = 999;
+    let confirmedBestTier = null;
+    for (let i = 0; i < sorted.length; i++) {
+        const entry = sorted[i];
+        const tier = String(entry.tier || '').trim();
+        if (!tier || tier.startsWith('R')) continue;
+        if (!PEAK_REQUIRED_DAYS_AC[tier]) continue;
+        const oldTier = String(entry.oldTier || '').trim();
+        if (oldTier === tier) continue; // holds event, not a promotion
+        const startDate = entry.ts;
+        if (!startDate) continue;
+        let endDate = Date.now();
+        for (let j = i + 1; j < sorted.length; j++) {
+            const next = sorted[j];
+            if (String(next.oldTier || '').trim() === tier && next.ts) {
+                endDate = next.ts;
+                break;
+            }
+        }
+        const heldDays = (endDate - startDate) / (24 * 60 * 60 * 1000);
+        if (heldDays >= PEAK_REQUIRED_DAYS_AC[tier]) {
+            const tierVal = resolveTierValueAC(tier);
+            if (tierVal) {
+                const order = TIER_ORDER_AC.indexOf(tierVal);
+                if (order !== -1 && order < confirmedBestOrder) {
+                    confirmedBestOrder = order;
+                    confirmedBestTier = tier;
+                }
             }
         }
     }
-    return bestTierText;
+    return confirmedBestTier;
 }
 
 function initAutocomplete(players) {
@@ -186,9 +216,10 @@ function loadFullPlayerData() {
                     if (!icon) return;
                     const tier = String(row.Tier).trim();
                     const oldTier = row.OldTier ? String(row.OldTier).trim() : null;
+                    const date    = row.Date    ? String(row.Date).trim()    : null;
                     if (!kitPageTierHistory[did]) kitPageTierHistory[did] = {};
                     if (!kitPageTierHistory[did][icon]) kitPageTierHistory[did][icon] = [];
-                    kitPageTierHistory[did][icon].push({ tier, oldTier });
+                    kitPageTierHistory[did][icon].push({ tier, oldTier, date });
                 });
             }
 
