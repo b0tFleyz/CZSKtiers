@@ -21,26 +21,55 @@ document.addEventListener('DOMContentLoaded', async function () {
         return idx === -1 ? 999 : idx;
     }
 
-    // Returns the highest regular (non-retire) tier text from history for a player/kit
+    // Parses Czech locale date string "D. M. YYYY" or "D.M.YYYY" into a timestamp
+    function parseCzechDate(str) {
+        if (!str) return null;
+        const m = str.match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/);
+        if (!m) return null;
+        return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1])).getTime();
+    }
+
+    // Returns the highest peak tier confirmed by holding it long enough:
+    // HT3 = 30 days, LT2/HT2 = 60 days, LT1/HT1 = 90 days
     function getPeakTierTextFromHistory(discordId, kitIcon) {
         const history = (tierHistory[discordId] || {})[kitIcon] || [];
-        let bestOrder = 999;
-        let bestTierText = null;
-        for (const entry of history) {
-            for (const tierText of [entry.tier, entry.oldTier]) {
-                if (!tierText) continue;
-                const t = String(tierText).trim();
-                if (!t || t.startsWith('R')) continue;
-                const tierVal = resolveTierValue(t);
-                if (!tierVal) continue;
-                const order = getTierOrder(tierVal);
-                if (order < bestOrder) {
-                    bestOrder = order;
-                    bestTierText = t;
+        if (history.length === 0) return null;
+        const PEAK_REQUIRED_DAYS = { 'HT3': 30, 'LT2': 60, 'HT2': 60, 'LT1': 90, 'HT1': 90 };
+        const sorted = history
+            .map(e => ({ ...e, ts: parseCzechDate(e.date) }))
+            .sort((a, b) => (a.ts || 0) - (b.ts || 0));
+        let confirmedBestOrder = 999;
+        let confirmedBestTier = null;
+        for (let i = 0; i < sorted.length; i++) {
+            const entry = sorted[i];
+            const tier = String(entry.tier || '').trim();
+            if (!tier || tier.startsWith('R')) continue;
+            if (!PEAK_REQUIRED_DAYS[tier]) continue;
+            const oldTier = String(entry.oldTier || '').trim();
+            if (oldTier === tier) continue; // holds event, not a promotion
+            const startDate = entry.ts;
+            if (!startDate) continue;
+            let endDate = Date.now();
+            for (let j = i + 1; j < sorted.length; j++) {
+                const next = sorted[j];
+                if (String(next.oldTier || '').trim() === tier && next.ts) {
+                    endDate = next.ts;
+                    break;
+                }
+            }
+            const heldDays = (endDate - startDate) / (24 * 60 * 60 * 1000);
+            if (heldDays >= PEAK_REQUIRED_DAYS[tier]) {
+                const tierVal = resolveTierValue(tier);
+                if (tierVal) {
+                    const order = getTierOrder(tierVal);
+                    if (order < confirmedBestOrder) {
+                        confirmedBestOrder = order;
+                        confirmedBestTier = tier;
+                    }
                 }
             }
         }
-        return bestTierText; // e.g. 'HT2', 'LT1', or null
+        return confirmedBestTier;
     }
 
     // Extracts peak tier info from TierHistory worksheet (already in-memory)
