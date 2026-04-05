@@ -105,6 +105,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     // Extracts peak tier info from TierHistory worksheet (already in-memory)
+    let _tierHistoryRowIdx = 0; // global row counter for ordering
     function processTierHistoryFromSheet(worksheet, nickToDiscordId) {
         const iconMap = {
             'Crystal': 'kit_icons/cpvp.png',
@@ -142,7 +143,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (!icon) return;
             if (!tierHistory[discordId]) tierHistory[discordId] = {};
             if (!tierHistory[discordId][icon]) tierHistory[discordId][icon] = [];
-            tierHistory[discordId][icon].push({ tier, date, note, kit, oldTier });
+            tierHistory[discordId][icon].push({ tier, date, note, kit, oldTier, _rowIdx: _tierHistoryRowIdx++ });
         });
     }
 
@@ -804,7 +805,8 @@ document.addEventListener('DOMContentLoaded', async function () {
                         tier: entry.tier,
                         oldTier: entry.oldTier || null,
                         date: entry.date,
-                        ts
+                        ts,
+                        _rowIdx: entry._rowIdx ?? 0
                     });
                 }
             }
@@ -812,8 +814,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         
         if (allEntries.length === 0) { recentEl.style.display = 'none'; return; }
         
-        // Sort by date descending
-        allEntries.sort((a, b) => b.ts - a.ts);
+        // Sort by sheet row descending (last added = newest), fallback to date
+        allEntries.sort((a, b) => b._rowIdx - a._rowIdx);
 
         // Split entries by guild
         const czskIcons = new Set(CZSK_KITS.map(k => k.icon));
