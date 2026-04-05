@@ -5,6 +5,38 @@ document.addEventListener('DOMContentLoaded', async function () {
     let currentSuggestionIndex = -1;
     let autocompleteInitialized = false;
 
+    // ===== FIRESTORE CARD SETTINGS =====
+    const _cardSettingsCache = {};
+    function _getFirestore() {
+        try { return firebase.firestore(); } catch { return null; }
+    }
+    async function loadCardSettingsFromFirestore(nick) {
+        if (!nick) return null;
+        const key = nick.toLowerCase();
+        if (_cardSettingsCache[key] !== undefined) return _cardSettingsCache[key];
+        const db = _getFirestore();
+        if (!db) return null;
+        try {
+            const doc = await db.collection('cardSettings').doc(key).get();
+            const data = doc.exists ? doc.data() : null;
+            _cardSettingsCache[key] = data;
+            return data;
+        } catch (e) {
+            console.warn('Firestore load failed:', e);
+            _cardSettingsCache[key] = null;
+            return null;
+        }
+    }
+
+    // Kit name → icon path map (for favorite kit display)
+    const KIT_NAME_TO_ICON = {
+        'Crystal':'kit_icons/cpvp.png','Axe':'kit_icons/axe.png','Sword':'kit_icons/sword.png',
+        'UHC':'kit_icons/uhc.png','Npot':'kit_icons/npot.png','Pot':'kit_icons/pot.png',
+        'SMP':'kit_icons/smp.png','DiaSMP':'kit_icons/diasmp.png','Mace':'kit_icons/mace.png',
+        'Speed':'kit_icons/speed.png','OGV':'kit_icons/OGV.png','Cart':'kit_icons/cart.png',
+        'Creeper':'kit_icons/creeper.png','DiaVanilla':'kit_icons/diavanilla.png'
+    };
+
     const TIER_ORDER = [
         "60", "48", "32", "24", "16", "10", "5", "3", "2", "1",
         "54", "43", "29", "22"
@@ -73,7 +105,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     // Extracts peak tier info from TierHistory worksheet (already in-memory)
-    function processTierHistoryFromSheet(worksheet) {
+    function processTierHistoryFromSheet(worksheet, nickToDiscordId) {
         const iconMap = {
             'Crystal': 'kit_icons/cpvp.png',
             'Axe': 'kit_icons/axe.png',
@@ -90,10 +122,16 @@ document.addEventListener('DOMContentLoaded', async function () {
             'Creeper': 'kit_icons/creeper.png',
             'DiaVanilla': 'kit_icons/diavanilla.png'
         };
+        const lookup = nickToDiscordId || {};
         const rows = XLSX.utils.sheet_to_json(worksheet);
         rows.forEach(row => {
             if (!row.Kit || !row.Tier) return;
-            const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : null;
+            let discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : null;
+            // Fallback: if Discord ID is missing, try to find it by Nick
+            if (!discordId && row.Nick) {
+                const nick = String(row.Nick).trim().toLowerCase();
+                discordId = lookup[nick] || null;
+            }
             if (!discordId) return;
             const kit     = String(row.Kit).trim();
             const tier    = String(row.Tier).trim();
@@ -247,6 +285,16 @@ document.addEventListener('DOMContentLoaded', async function () {
     let overallData = [];
     let discordIdToNick = {}; // Discord ID → Nick, built from spreadsheet data
     let tierHistory = {}; // keyed by discordId → kitIcon → [{tier, date, note, kit, oldTier}]
+
+    // Load card settings from localStorage for the logged-in user
+    function getMyCardSettings() {
+        try {
+            const auth = window.CZSKAuth && CZSKAuth.getCurrentUser();
+            if (!auth || !auth.nick) return null;
+            const raw = localStorage.getItem('czsktiers_card_' + auth.nick.toLowerCase());
+            return raw ? JSON.parse(raw) : null;
+        } catch { return null; }
+    }
     // Načti overall jako pole objektů a vygeneruj karty
     async function nactiOverallExcel(url) {
         const response = await fetch(url);
@@ -257,10 +305,38 @@ document.addEventListener('DOMContentLoaded', async function () {
         const _sheetTab = _conf ? _conf.sheetTab : null;
         const _histTab = _conf ? _conf.tierHistoryTab : 'TierHistory';
 
-        // Process TierHistory from the same workbook so peak tiers are available immediately
+        // Pre-build Nick ↔ Discord ID mappings from Overall + TierHistory
+        // so we can fill in missing Discord IDs/Nicks in TierHistory rows
+        const nickToDiscordId = {};
+        // 1) From Overall sheet
+        const _preSheet = _sheetTab ? workbook.Sheets[_sheetTab] : workbook.Sheets[workbook.SheetNames[0]];
+        if (_preSheet) {
+            XLSX.utils.sheet_to_json(_preSheet).forEach(r => {
+                const did = r['Discord ID'] ? String(r['Discord ID']).trim() : null;
+                const nick = r.Nick ? String(r.Nick).trim() : null;
+                if (did && nick) {
+                    nickToDiscordId[nick.toLowerCase()] = did;
+                    if (!discordIdToNick[did]) discordIdToNick[did] = nick;
+                }
+            });
+        }
+        // 2) From TierHistory rows that DO have both Nick and Discord ID (covers old nicks)
         const histSheetName = workbook.SheetNames.find(n => n === _histTab) || workbook.SheetNames.find(n => n === 'TierHistory');
         if (histSheetName) {
-            processTierHistoryFromSheet(workbook.Sheets[histSheetName]);
+            XLSX.utils.sheet_to_json(workbook.Sheets[histSheetName]).forEach(r => {
+                const did = r['Discord ID'] ? String(r['Discord ID']).trim() : null;
+                const nick = r.Nick ? String(r.Nick).trim() : null;
+                if (did && nick) {
+                    const key = nick.toLowerCase();
+                    if (!nickToDiscordId[key]) nickToDiscordId[key] = did;
+                    if (!discordIdToNick[did]) discordIdToNick[did] = nick;
+                }
+            });
+        }
+
+        // Process TierHistory from the same workbook so peak tiers are available immediately
+        if (histSheetName) {
+            processTierHistoryFromSheet(workbook.Sheets[histSheetName], nickToDiscordId);
         }
 
         // Also load the OTHER guild's tier history for cross-guild achievements (Tierlist GOD)
@@ -270,7 +346,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             const otherHistTab = _otherConf.tierHistoryTab;
             const otherHistSheet = workbook.SheetNames.find(n => n === otherHistTab);
             if (otherHistSheet) {
-                processTierHistoryFromSheet(workbook.Sheets[otherHistSheet]);
+                processTierHistoryFromSheet(workbook.Sheets[otherHistSheet], nickToDiscordId);
             }
         }
 
@@ -303,7 +379,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
         const rows = XLSX.utils.sheet_to_json(worksheet);
 
-        // Build Discord ID → Nick map for tier history bridging
+        // Ensure discordIdToNick is fully populated (in case pre-build used different sheet ref)
         rows.forEach(row => {
             const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : null;
             const nick = row.Nick ? String(row.Nick).trim() : null;
@@ -768,6 +844,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                     }
                 }
                 const avatarSrc = e.uuid ? `https://mc-heads.net/avatar/${e.uuid}/32` : '';
+                const kitIconSrc = e.icon || '';
                 html += `
                     <div class="recent-card">
                         ${avatarSrc ? `<img class="recent-avatar" src="${avatarSrc}" alt="" loading="lazy">` : ''}
@@ -775,6 +852,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                             <span class="recent-nick">${e.nick}</span>
                             <span class="recent-date">${e.date}</span>
                         </div>
+                        ${kitIconSrc ? `<img class="recent-kit-icon" src="${kitIconSrc}" alt="${e.kit || ''}" title="${e.kit || ''}">` : ''}
                         <span class="recent-badge" style="${badgeStyle}">${info.novyText}</span>
                         ${dirHtml}
                     </div>`;
@@ -783,12 +861,12 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
 
         let html = '';
-        if (czskEntries.length > 0) {
+        if (_guild === 'czsktiers' && czskEntries.length > 0) {
             html += '<div class="recent-header">Nedávno testováno — CZSKTiers</div><div class="recent-cards">';
             html += buildCards(czskEntries, 8);
             html += '</div>';
         }
-        if (subEntries.length > 0) {
+        if (_guild === 'subtiers' && subEntries.length > 0) {
             html += '<div class="recent-header">Nedávno testováno — SubTiers</div><div class="recent-cards">';
             html += buildCards(subEntries, 8);
             html += '</div>';
@@ -1070,9 +1148,96 @@ document.addEventListener('DOMContentLoaded', async function () {
     })();
 
     // MODAL funkce
-    function showPlayerModal({ name, position, score, skin, kitsHtml, tiers, nick, discordId, hallOfFame, tester, allTestedIcons }) {
+    async function showPlayerModal({ name, position, score, skin, kitsHtml, tiers, nick, discordId, hallOfFame, tester, allTestedIcons }) {
         const modal = document.getElementById('player-modal');
-        modal.querySelector('.player-modal-name').textContent = name;
+        const content = modal.querySelector('.player-modal-content');
+        const banner = modal.querySelector('#player-modal-banner');
+        const bioEl = modal.querySelector('#player-modal-bio');
+        const nameEl = modal.querySelector('.player-modal-name');
+        const favkitEl = modal.querySelector('#player-modal-favkit');
+        const decoWrap = modal.querySelector('#avatar-deco-wrap');
+
+        // Show modal immediately with loading state
+        content.classList.add('modal-loading');
+        modal.style.display = 'flex';
+
+        // Reset decoration, name effect, theme
+        if (decoWrap) { decoWrap.removeAttribute('data-deco'); }
+        const decoOverlay = modal.querySelector('#avatar-deco-overlay');
+        if (decoOverlay) { decoOverlay.style.display = 'none'; decoOverlay.src = ''; }
+        nameEl.className = 'player-modal-name';
+        content.className = 'player-modal-content modal-loading';
+        content.removeAttribute('data-theme');
+
+        // Reset customization defaults
+        banner.style.display = 'none';
+        bioEl.style.display = 'none';
+        nameEl.style.color = '';
+        content.style.borderColor = '';
+        if (favkitEl) favkitEl.style.display = 'none';
+
+        // Load card settings — try Firestore first (public for any player), fallback to localStorage for own card
+        let cardSettings = null;
+        const playerNick = nick || name || '';
+        try {
+            cardSettings = await loadCardSettingsFromFirestore(playerNick);
+        } catch { /* ignore */ }
+        if (!cardSettings) {
+            const auth = window.CZSKAuth && CZSKAuth.getCurrentUser();
+            const isMyCard = auth && auth.nick && auth.nick.toLowerCase() === playerNick.toLowerCase();
+            if (isMyCard) {
+                cardSettings = getMyCardSettings();
+            }
+        }
+
+        // Apply card customizations (for any player now)
+        if (cardSettings) {
+            if (cardSettings.banner) {
+                banner.style.background = cardSettings.banner;
+                banner.style.display = '';
+            }
+            if (cardSettings.accent) {
+                nameEl.style.color = cardSettings.accent;
+                content.style.borderColor = cardSettings.accent + '33';
+            }
+            if (cardSettings.bio) {
+                bioEl.textContent = cardSettings.bio;
+                bioEl.style.display = '';
+            }
+            if (favkitEl && cardSettings.favoriteKit) {
+                const kitIcon = KIT_NAME_TO_ICON[cardSettings.favoriteKit] || '';
+                const iconHtml = kitIcon ? '<img class="favkit-icon" src="' + kitIcon + '" alt="">' : '';
+                favkitEl.innerHTML = '<span class="favkit-label">Oblíbený kit:</span> ' + iconHtml + '<span class="favkit-value">' + cardSettings.favoriteKit + '</span>';
+                if (cardSettings.accent) {
+                    const fv = favkitEl.querySelector('.favkit-value');
+                    if (fv) fv.style.color = cardSettings.accent;
+                }
+                favkitEl.style.display = '';
+            }
+            // Apply avatar decoration (image overlay + glow)
+            if (decoWrap && cardSettings.decoration) {
+                decoWrap.setAttribute('data-deco', cardSettings.decoration);
+                if (decoOverlay) {
+                    decoOverlay.src = 'decorations/' + cardSettings.decoration + '.png';
+                    decoOverlay.style.display = '';
+                    decoOverlay.onerror = () => { decoOverlay.style.display = 'none'; };
+                }
+            }
+            // Apply name effect
+            if (cardSettings.nameEffect) {
+                nameEl.classList.add('name-effect-' + cardSettings.nameEffect);
+                if (cardSettings.nameEffect === 'gradient' || cardSettings.nameEffect === 'rainbow') {
+                    nameEl.style.color = '';  // Let gradient take over
+                }
+            }
+            // Apply profile theme
+            if (cardSettings.theme) {
+                content.setAttribute('data-theme', cardSettings.theme);
+            }
+        }
+
+        // Set player name
+        nameEl.textContent = name;
 
         // Nastav barvu podle pořadí
         let rankClass = "rank-other";
@@ -1085,14 +1250,12 @@ document.addEventListener('DOMContentLoaded', async function () {
         rankElem.textContent = position + ".";
 
         modal.querySelector('.player-modal-score').textContent = `${score} points`;
-        // Score title in modal
         const stModal = getScoreTitle(score);
         const scoreTitleEl = modal.querySelector('.player-modal-score-title');
         if (scoreTitleEl) {
             scoreTitleEl.textContent = stModal.title;
             scoreTitleEl.style.color = stModal.color;
         }
-        // Days on tierlist in modal
         const daysEl = modal.querySelector('.player-modal-days');
         if (daysEl) {
             const firstDate = getPlayerFirstDate(discordId);
@@ -1119,11 +1282,9 @@ document.addEventListener('DOMContentLoaded', async function () {
             modal.querySelectorAll('.player-modal-tiers .kit-badge').forEach((badge) => {
                 const kitIcon = badge.dataset.kitIcon;
                 if (!kitIcon) return;
-                // Find matching tier by icon
                 const match = sortedTiers.find(t => t.icon === kitIcon);
                 if (!match) return;
                 badge.classList.add('badge-journey-clickable');
-                // Clone to remove old listeners
                 const fresh = badge.cloneNode(true);
                 badge.parentNode.replaceChild(fresh, badge);
                 fresh.addEventListener('click', (e) => {
@@ -1148,7 +1309,8 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
         }
 
-        modal.style.display = 'flex';
+        // Remove loading state — reveal content
+        content.classList.remove('modal-loading');
     }
 
     function computeAchievements({ name, position, score, tiers, discordId, hallOfFame, tester, allTestedIcons }) {
@@ -1543,7 +1705,13 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Build score timeline from tier history
         // Each tier history entry has: kit, tier, date, oldTier
         // We reconstruct cumulative score at each date
-        const history = (discordId && tierHistory[discordId]) || {};
+        // Filter to only active guild's kits
+        const _activeKitIcons = new Set(kits.map(k => k.icon));
+        const fullHistory = (discordId && tierHistory[discordId]) || {};
+        const history = {};
+        for (const [kitIcon, entries] of Object.entries(fullHistory)) {
+            if (_activeKitIcons.has(kitIcon)) history[kitIcon] = entries;
+        }
         const events = []; // { ts, date, kitIcon, oldVal, newVal }
 
         for (const [kitIcon, entries] of Object.entries(history)) {

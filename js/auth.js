@@ -112,10 +112,14 @@
 
     const auth = getAuth();
     if (auth?.nick) {
+      const inKitsDir = location.pathname.includes('/kits/');
+      const profileHref = (inKitsDir ? '../' : '') + 'profile.html';
       container.innerHTML = `
         <div class="auth-user">
-          <img src="https://mc-heads.net/avatar/${auth.nick}/24" alt="" class="auth-avatar">
-          <span class="auth-nick">${auth.nick}</span>
+          <a href="${profileHref}" class="auth-profile-link" title="Můj profil">
+            <img src="https://mc-heads.net/avatar/${auth.nick}/24" alt="" class="auth-avatar">
+            <span class="auth-nick">${auth.nick}</span>
+          </a>
           <button class="auth-logout-btn" title="Odhlásit se">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>

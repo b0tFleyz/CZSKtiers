@@ -191,6 +191,9 @@ function updateSuggestionSelection(suggestions) {
 }
 
 function loadFullPlayerData() {
+    const _guild = (typeof getActiveGuild === 'function') ? getActiveGuild() : 'czsktiers';
+    const _conf = (typeof getGuildConf === 'function') ? getGuildConf(_guild) : null;
+
     fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx')
         .then(res => res.arrayBuffer())
         .then(data => {
@@ -203,9 +206,13 @@ function loadFullPlayerData() {
                 'Sword': 'kit_icons/sword.png', 'UHC': 'kit_icons/uhc.png',
                 'Npot': 'kit_icons/npot.png', 'NPot': 'kit_icons/npot.png',
                 'Pot': 'kit_icons/pot.png', 'SMP': 'kit_icons/smp.png',
-                'DiaSMP': 'kit_icons/diasmp.png', 'Mace': 'kit_icons/mace.png'
+                'DiaSMP': 'kit_icons/diasmp.png', 'Mace': 'kit_icons/mace.png',
+                'Speed': 'kit_icons/speed.png', 'OGV': 'kit_icons/OGV.png',
+                'Cart': 'kit_icons/cart.png', 'Creeper': 'kit_icons/creeper.png',
+                'DiaVanilla': 'kit_icons/diavanilla.png'
             };
-            const histSheetName = workbook.SheetNames.find(n => n === 'TierHistory');
+            const _histTab = _conf ? _conf.tierHistoryTab : 'TierHistory';
+            const histSheetName = workbook.SheetNames.find(n => n === _histTab) || workbook.SheetNames.find(n => n === 'TierHistory');
             if (histSheetName) {
                 const histRows = XLSX.utils.sheet_to_json(workbook.Sheets[histSheetName]);
                 histRows.forEach(row => {
@@ -223,10 +230,19 @@ function loadFullPlayerData() {
                 });
             }
 
-            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            // Pick correct sheet tab for active guild
+            const _sheetTab = _conf ? _conf.sheetTab : null;
+            let worksheet;
+            if (_sheetTab) {
+                worksheet = workbook.Sheets[_sheetTab];
+            } else {
+                worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            }
+            if (!worksheet) worksheet = workbook.Sheets[workbook.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(worksheet);
-            
-            const kits = [
+
+            // Use guild-specific kits
+            const CZSK_KITS_AC = [
                 { key: "Crystal", icon: "kit_icons/cpvp.png" },
                 { key: "Axe", icon: "kit_icons/axe.png" },
                 { key: "Sword", icon: "kit_icons/sword.png" },
@@ -237,6 +253,14 @@ function loadFullPlayerData() {
                 { key: "DiaSMP", icon: "kit_icons/diasmp.png" },
                 { key: "Mace", icon: "kit_icons/mace.png" }
             ];
+            const SUB_KITS_AC = [
+                { key: "Speed", icon: "kit_icons/speed.png" },
+                { key: "OGV", icon: "kit_icons/OGV.png" },
+                { key: "Cart", icon: "kit_icons/cart.png" },
+                { key: "Creeper", icon: "kit_icons/creeper.png" },
+                { key: "DiaVanilla", icon: "kit_icons/diavanilla.png" }
+            ];
+            const kits = (_guild === 'subtiers') ? SUB_KITS_AC : CZSK_KITS_AC;
             
             fullPlayerData = rows.filter(row => row.UUID && row.Nick).map(row => {
                 const tiers = [];

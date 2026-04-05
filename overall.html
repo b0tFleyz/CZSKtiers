@@ -63,15 +63,25 @@
 
     <div id="player-modal" class="player-modal" style="display:none;">
       <div class="player-modal-content">
+        <div class="player-modal-banner" id="player-modal-banner"></div>
         <span class="player-modal-close">&times;</span>
-        <img class="player-modal-skin" src="" alt="skin" style="width:90px;height:90px;border-radius:50%;margin-bottom:10px;">
+        <div class="modal-loader">
+          <div class="modal-loader-spinner"></div>
+          <div class="modal-loader-text">Načítání...</div>
+        </div>
+        <div class="avatar-deco-wrap" id="avatar-deco-wrap">
+          <img class="player-modal-skin" src="" alt="skin">
+          <img class="avatar-deco-overlay" id="avatar-deco-overlay" src="" alt="" style="display:none;">
+        </div>
         <div class="player-modal-name"></div>
+        <div class="player-modal-bio" id="player-modal-bio" style="display:none;"></div>
         <div class="player-modal-position">
           <span class="player-modal-rank"></span>
           <span class="player-modal-score"></span>
           <span class="player-modal-score-title"></span>
         </div>
         <div class="player-modal-days" style="display:none;"></div>
+        <div class="player-modal-favkit" id="player-modal-favkit" style="display:none;"></div>
         <div class="player-modal-tiers"></div>
         <div class="player-modal-achievements"></div>
         <div class="player-modal-actions">
@@ -165,6 +175,7 @@
     <script src="js/player-count.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <script src="js/firebase-config.js"></script>
     <script>if(typeof FIREBASE_CONFIG!=='undefined'&&FIREBASE_CONFIG.apiKey&&!FIREBASE_CONFIG.apiKey.startsWith('PASTE'))firebase.initializeApp(FIREBASE_CONFIG);</script>
     <script src="js/auth.js"></script>

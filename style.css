@@ -1108,6 +1108,17 @@ tbody tr:nth-child(3) td:nth-child(2) {
     white-space: nowrap;
     margin-left: auto;
 }
+.recent-kit-icon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    margin-left: auto;
+    flex-shrink: 0;
+    border-radius: 4px;
+}
+.recent-kit-icon + .recent-badge {
+    margin-left: 6px;
+}
 .recent-dir {
     font-size: 0.8em;
     line-height: 1;
@@ -1118,6 +1129,7 @@ tbody tr:nth-child(3) td:nth-child(2) {
 @media (max-width: 600px) {
     .recent-cards { gap: 8px; }
     .recent-card { min-width: 160px; padding: 8px 12px; }
+    .recent-kit-icon { width: 18px; height: 18px; }
 }
 
 /* ========== PLAYER COUNT BADGE (in header) ========== */
@@ -1214,6 +1226,16 @@ tbody tr:nth-child(3) td:nth-child(2) {
     font-size: 0.85em;
     font-weight: 700;
     color: var(--text-primary);
+}
+.auth-profile-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: opacity 0.2s;
+}
+.auth-profile-link:hover {
+    opacity: 0.8;
 }
 .auth-logout-btn {
     display: flex;
@@ -2539,12 +2561,17 @@ tbody tr:nth-child(3) td:nth-child(2) {
     max-width: 600px;
     color: #fff;
     position: relative;
+    overflow: hidden;
     box-shadow: 0 16px 64px rgba(0,0,0,0.6),
                 0 0 0 1px rgba(var(--accent-rgb), 0.15),
                 0 0 80px rgba(var(--accent-rgb), 0.06);
     text-align: center;
     border: 1px solid rgba(var(--accent-rgb), 0.1);
     animation: modalContentIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+.player-modal-content > *:not(.player-modal-banner):not(.player-modal-close):not(.modal-loader) {
+    position: relative;
+    z-index: 1;
 }
 @keyframes modalContentIn {
     from {
@@ -2558,16 +2585,59 @@ tbody tr:nth-child(3) td:nth-child(2) {
 }
 .player-modal-close {
     position: absolute;
-    right: 18px;
+    left: 18px;
     top: 12px;
     font-size: 2em;
     cursor: pointer;
     color: #fff;
     opacity: 0.7;
     transition: opacity 0.2s;
+    z-index: 10;
 }
 .player-modal-close:hover {
     opacity: 1;
+}
+.player-modal-banner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100px;
+    border-radius: 22px 22px 0 0;
+    z-index: 0;
+    pointer-events: none;
+}
+.player-modal-banner::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 50px;
+    background: linear-gradient(to bottom, transparent, var(--bg-deep));
+}
+.player-modal-bio {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    margin-bottom: 10px;
+    word-break: break-word;
+    font-style: italic;
+}
+.player-modal-favkit {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.player-modal-favkit .favkit-label {
+    opacity: 0.7;
+}
+.player-modal-favkit .favkit-value {
+    font-weight: 700;
+    color: var(--accent);
 }
 .player-modal-name {
     font-size: 2em;
@@ -2599,10 +2669,346 @@ tbody tr:nth-child(3) td:nth-child(2) {
     width: 100px !important;
     height: 100px !important;
     border-radius: 50%;
-    margin-bottom: 16px;
     border: 3px solid rgba(238, 205, 20, 0.4);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     image-rendering: pixelated;
+    position: relative;
+    z-index: 1;
+}
+
+/* ===== MODAL LOADING STATE ===== */
+.modal-loader {
+    display: none;
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+}
+.player-modal-content.modal-loading .modal-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+.player-modal-content.modal-loading > *:not(.player-modal-close):not(.modal-loader) {
+    opacity: 0;
+    transition: none;
+}
+.player-modal-content:not(.modal-loading) > * {
+    animation: modalFadeIn 0.3s ease both;
+}
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.modal-loader-spinner {
+    width: 36px; height: 36px;
+    border: 3px solid rgba(255,255,255,0.12);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: modal-spin 0.7s linear infinite;
+}
+.modal-loader-text {
+    font-size: 0.78em;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 0.5px;
+}
+@keyframes modal-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ===== AVATAR DECORATION SYSTEM (Image-based) ===== */
+.avatar-deco-wrap {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 16px;
+    width: 120px;
+    height: 120px;
+    transform: translateZ(0);
+    will-change: transform;
+}
+.avatar-deco-wrap .player-modal-skin {
+    margin-bottom: 0;
+    position: relative;
+    z-index: 1;
+    /* Center avatar inside 120px wrap (skin is 100px) */
+    margin: 10px;
+}
+/* Overlay image — sits on top of avatar */
+.avatar-deco-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 120px; height: 120px;
+    pointer-events: none;
+    z-index: 2;
+    image-rendering: auto;
+}
+/* Glow layer — sits behind avatar */
+.avatar-deco-wrap::before {
+    content: '';
+    position: absolute;
+    top: 4px; left: 4px; right: 4px; bottom: 4px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0;
+    transition: opacity 0.4s;
+}
+
+/* === MINECRAFT DECORATIONS === */
+.avatar-deco-wrap[data-deco="diamond"]::before {
+    opacity: 1;
+    box-shadow: 0 0 14px rgba(91, 240, 255, 0.5), 0 0 35px rgba(91, 240, 255, 0.2);
+    animation: glow-pulse 2.5s ease-in-out infinite;
+    --glow-color: 91, 240, 255;
+}
+.avatar-deco-wrap[data-deco="diamond"] .player-modal-skin { border-color: rgba(91, 240, 255, 0.5); }
+
+.avatar-deco-wrap[data-deco="netherite"]::before {
+    opacity: 1;
+    box-shadow: 0 0 10px rgba(100, 80, 70, 0.5), 0 0 25px rgba(200, 160, 140, 0.15);
+    animation: glow-pulse 4s ease-in-out infinite;
+    --glow-color: 100, 80, 70;
+}
+.avatar-deco-wrap[data-deco="netherite"] .player-modal-skin { border-color: rgba(80, 70, 65, 0.7); }
+
+.avatar-deco-wrap[data-deco="enchant"]::before {
+    opacity: 1;
+    box-shadow: 0 0 16px rgba(168, 85, 247, 0.5), 0 0 40px rgba(168, 85, 247, 0.2);
+    animation: glow-pulse 2s ease-in-out infinite;
+    --glow-color: 168, 85, 247;
+}
+.avatar-deco-wrap[data-deco="enchant"] .player-modal-skin { border-color: rgba(168, 85, 247, 0.5); }
+
+.avatar-deco-wrap[data-deco="bedrock"]::before {
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(140, 140, 140, 0.4), 0 0 20px rgba(80, 80, 80, 0.2);
+    --glow-color: 140, 140, 140;
+}
+.avatar-deco-wrap[data-deco="bedrock"] .player-modal-skin { border-color: rgba(100, 100, 100, 0.6); }
+
+/* === ANIME / SANRIO === */
+.avatar-deco-wrap[data-deco="kuromi"]::before {
+    opacity: 1;
+    box-shadow: 0 0 14px rgba(120, 60, 160, 0.4), 0 0 30px rgba(80, 20, 120, 0.15);
+    animation: glow-pulse 3s ease-in-out infinite;
+    --glow-color: 120, 60, 160;
+}
+.avatar-deco-wrap[data-deco="kuromi"] .player-modal-skin { border-color: rgba(120, 60, 160, 0.5); }
+
+.avatar-deco-wrap[data-deco="kitty"]::before {
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(255, 100, 130, 0.4), 0 0 28px rgba(255, 150, 170, 0.15);
+    animation: glow-pulse 3s ease-in-out infinite;
+    --glow-color: 255, 100, 130;
+}
+.avatar-deco-wrap[data-deco="kitty"] .player-modal-skin { border-color: rgba(255, 100, 130, 0.5); }
+
+.avatar-deco-wrap[data-deco="sakura"]::before {
+    opacity: 1;
+    box-shadow: 0 0 15px rgba(255, 154, 191, 0.5), 0 0 40px rgba(255, 182, 210, 0.2);
+    animation: glow-pulse 3s ease-in-out infinite;
+    --glow-color: 255, 154, 191;
+}
+.avatar-deco-wrap[data-deco="sakura"] .player-modal-skin { border-color: rgba(255, 154, 191, 0.5); }
+
+/* === GAMING === */
+.avatar-deco-wrap[data-deco="fire"]::before {
+    opacity: 1;
+    box-shadow: 0 0 18px rgba(255, 107, 53, 0.6), 0 0 40px rgba(255, 60, 0, 0.25);
+    animation: glow-fire 1.5s ease-in-out infinite;
+    --glow-color: 255, 107, 53;
+}
+.avatar-deco-wrap[data-deco="fire"] .player-modal-skin { border-color: rgba(255, 107, 53, 0.5); }
+
+.avatar-deco-wrap[data-deco="lightning"]::before {
+    opacity: 1;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    animation: glow-lightning 2.5s ease-in-out infinite;
+}
+.avatar-deco-wrap[data-deco="lightning"] .player-modal-skin { border-color: rgba(0, 212, 255, 0.5); }
+
+.avatar-deco-wrap[data-deco="crown"]::before {
+    opacity: 1;
+    box-shadow: 0 0 14px rgba(238, 205, 20, 0.4), 0 0 30px rgba(238, 205, 20, 0.15);
+    animation: glow-pulse 3s ease-in-out infinite;
+    --glow-color: 238, 205, 20;
+}
+.avatar-deco-wrap[data-deco="crown"] .player-modal-skin { border-color: rgba(238, 205, 20, 0.5); }
+
+.avatar-deco-wrap[data-deco="skull"]::before {
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(200, 30, 30, 0.4), 0 0 28px rgba(150, 0, 0, 0.15);
+    animation: glow-pulse 2s ease-in-out infinite;
+    --glow-color: 200, 30, 30;
+}
+.avatar-deco-wrap[data-deco="skull"] .player-modal-skin { border-color: rgba(200, 30, 30, 0.5); }
+
+/* === ACCESSORIES === */
+.avatar-deco-wrap[data-deco="catears"]::before {
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(255, 158, 193, 0.4), 0 0 25px rgba(255, 158, 193, 0.15);
+    --glow-color: 255, 158, 193;
+}
+.avatar-deco-wrap[data-deco="catears"] .player-modal-skin { border-color: rgba(255, 158, 193, 0.5); }
+
+.avatar-deco-wrap[data-deco="bunnyears"]::before {
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(255, 200, 220, 0.4), 0 0 25px rgba(255, 200, 220, 0.15);
+    --glow-color: 255, 200, 220;
+}
+.avatar-deco-wrap[data-deco="bunnyears"] .player-modal-skin { border-color: rgba(255, 200, 220, 0.5); }
+
+.avatar-deco-wrap[data-deco="angelwings"]::before {
+    opacity: 1;
+    box-shadow: 0 0 14px rgba(220, 230, 255, 0.4), 0 0 30px rgba(200, 210, 255, 0.2);
+    animation: glow-pulse 3s ease-in-out infinite;
+    --glow-color: 220, 230, 255;
+}
+.avatar-deco-wrap[data-deco="angelwings"] .player-modal-skin { border-color: rgba(220, 230, 255, 0.5); }
+
+/* === SEASONAL === */
+.avatar-deco-wrap[data-deco="christmas"]::before {
+    opacity: 1;
+    box-shadow: 0 0 14px rgba(220, 40, 40, 0.4), 0 0 30px rgba(0, 160, 0, 0.15);
+    animation: glow-christmas 2s ease-in-out infinite;
+}
+.avatar-deco-wrap[data-deco="christmas"] .player-modal-skin { border-color: rgba(220, 40, 40, 0.5); }
+
+.avatar-deco-wrap[data-deco="halloween"]::before {
+    opacity: 1;
+    box-shadow: 0 0 16px rgba(255, 140, 0, 0.5), 0 0 35px rgba(130, 0, 200, 0.2);
+    animation: glow-halloween 2s ease-in-out infinite;
+}
+.avatar-deco-wrap[data-deco="halloween"] .player-modal-skin { border-color: rgba(255, 140, 0, 0.5); }
+
+.avatar-deco-wrap[data-deco="summer"]::before {
+    opacity: 1;
+    box-shadow: 0 0 14px rgba(255, 200, 50, 0.4), 0 0 30px rgba(0, 180, 255, 0.15);
+    animation: glow-pulse 3s ease-in-out infinite;
+    --glow-color: 255, 200, 50;
+}
+.avatar-deco-wrap[data-deco="summer"] .player-modal-skin { border-color: rgba(255, 200, 50, 0.5); }
+
+/* === GLOW ANIMATIONS === */
+@keyframes glow-pulse {
+    0%, 100% { box-shadow: 0 0 14px rgba(var(--glow-color), 0.4), 0 0 30px rgba(var(--glow-color), 0.15); }
+    50% { box-shadow: 0 0 24px rgba(var(--glow-color), 0.65), 0 0 50px rgba(var(--glow-color), 0.3); }
+}
+@keyframes glow-fire {
+    0%, 100% { box-shadow: 0 0 16px rgba(255, 107, 53, 0.5), 0 0 35px rgba(255, 60, 0, 0.2); }
+    33% { box-shadow: 0 0 24px rgba(255, 140, 0, 0.65), 0 0 50px rgba(255, 60, 0, 0.3); }
+    66% { box-shadow: 0 0 18px rgba(255, 80, 20, 0.55), 0 0 40px rgba(255, 40, 0, 0.25); }
+}
+@keyframes glow-lightning {
+    0%, 88%, 100% { box-shadow: 0 0 10px rgba(0, 212, 255, 0.3); }
+    90% { box-shadow: 0 0 35px rgba(0, 212, 255, 0.9), 0 0 65px rgba(0, 212, 255, 0.5); }
+    93% { box-shadow: 0 0 10px rgba(0, 212, 255, 0.3); }
+    95% { box-shadow: 0 0 28px rgba(0, 212, 255, 0.7), 0 0 55px rgba(0, 212, 255, 0.4); }
+}
+@keyframes glow-christmas {
+    0%, 100% { box-shadow: 0 0 14px rgba(220, 40, 40, 0.5), 0 0 30px rgba(0, 160, 0, 0.15); }
+    50% { box-shadow: 0 0 14px rgba(0, 160, 0, 0.5), 0 0 30px rgba(220, 40, 40, 0.15); }
+}
+@keyframes glow-halloween {
+    0%, 100% { box-shadow: 0 0 16px rgba(255, 140, 0, 0.5), 0 0 35px rgba(130, 0, 200, 0.15); }
+    50% { box-shadow: 0 0 16px rgba(130, 0, 200, 0.5), 0 0 35px rgba(255, 140, 0, 0.15); }
+}
+
+/* ===== NAME EFFECTS ===== */
+.name-effect-gradient {
+    background: linear-gradient(90deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff, #ff6b6b);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: name-gradient 3s linear infinite;
+}
+@keyframes name-gradient {
+    to { background-position: 200% center; }
+}
+.name-effect-rainbow {
+    background: linear-gradient(90deg, #ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff, #ff0000);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: name-gradient 2s linear infinite;
+}
+.name-effect-glitch {
+    position: relative;
+    animation: name-glitch 3s infinite;
+}
+@keyframes name-glitch {
+    0%, 90%, 100% { transform: none; opacity: 1; }
+    91% { transform: translateX(-2px) skewX(-1deg); opacity: 0.8; }
+    92% { transform: translateX(2px) skewX(1deg); opacity: 1; }
+    93% { transform: translateX(-1px); opacity: 0.9; }
+    94% { transform: none; opacity: 1; }
+}
+.name-effect-glow {
+    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 40px currentColor;
+    animation: name-glow 2s ease-in-out infinite;
+}
+@keyframes name-glow {
+    0%, 100% { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+    50% { text-shadow: 0 0 16px currentColor, 0 0 30px currentColor, 0 0 50px currentColor; }
+}
+.name-effect-typewriter {
+    overflow: hidden;
+    white-space: nowrap;
+    border-right: 2px solid rgba(255,255,255,0.6);
+    animation: name-typewriter 3.5s steps(20) 1 both, name-blink 0.75s step-end infinite;
+    display: inline-block;
+    max-width: 100%;
+}
+@keyframes name-typewriter {
+    from { width: 0; }
+    to { width: 100%; }
+}
+@keyframes name-blink {
+    50% { border-color: transparent; }
+}
+
+/* ===== PROFILE THEMES ===== */
+.player-modal-content[data-theme="neon"] {
+    border: 1px solid rgba(0, 255, 200, 0.3) !important;
+    box-shadow: 0 16px 64px rgba(0,0,0,0.6),
+                0 0 0 1px rgba(0, 255, 200, 0.15),
+                0 0 60px rgba(0, 255, 200, 0.08),
+                inset 0 0 60px rgba(0, 255, 200, 0.03) !important;
+}
+.player-modal-content[data-theme="dark"] {
+    background: linear-gradient(135deg, #0a0a0e 0%, #111118 100%) !important;
+    border: 1px solid rgba(255,255,255,0.04) !important;
+}
+.player-modal-content[data-theme="retro"] {
+    background: linear-gradient(135deg, #1a0a2e 0%, #16213e 50%, #0a1628 100%) !important;
+    border: 1px solid rgba(100, 80, 200, 0.2) !important;
+    box-shadow: 0 16px 64px rgba(0,0,0,0.6),
+                0 0 40px rgba(100, 80, 200, 0.08),
+                inset 0 1px 0 rgba(100, 80, 200, 0.1) !important;
+}
+.player-modal-content[data-theme="minecraft"] {
+    background: linear-gradient(135deg, #2d1a0e 0%, #1a1a0e 100%) !important;
+    border: 1px solid rgba(139, 90, 43, 0.3) !important;
+    box-shadow: 0 16px 64px rgba(0,0,0,0.6),
+                0 0 30px rgba(139, 90, 43, 0.1) !important;
+}
+.player-modal-content[data-theme="glass"] {
+    background: rgba(30, 30, 40, 0.7) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.1) !important;
+}
+
+/* Favorite kit icon in modal */
+.player-modal-favkit .favkit-icon {
+    width: 20px; height: 20px;
+    vertical-align: middle;
+    image-rendering: pixelated;
+    margin-left: 2px;
+    border-radius: 4px;
 }
 
 .player-modal-score {

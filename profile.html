@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="cz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#23242a">
+    <title>CZSK Tierlist – Profil</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://mc-heads.net">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            min-height: 100vh;
+            background: var(--bg-deep);
+            padding-bottom: 60px;
+        }
+        .profile-wrapper {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 24px 16px;
+        }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95em;
+            margin-bottom: 20px;
+            transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--accent); }
+
+        /* Preview uses the same modal styles */
+        .preview-card {
+            pointer-events: none;
+            margin-bottom: 28px;
+        }
+        .preview-card .player-modal-content {
+            animation: none;
+            min-width: unset;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* === CUSTOMIZE PANEL === */
+        .customize-panel {
+            background: var(--bg-card);
+            border-radius: 22px;
+            padding: 28px;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        .customize-title {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0 0 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .customize-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .customize-group {
+            flex: 1;
+            min-width: 180px;
+        }
+        .customize-label {
+            font-size: 0.82em;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .customize-input {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.9em;
+            outline: none;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+        .customize-input:focus {
+            border-color: var(--accent);
+        }
+        .color-picker-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .color-swatch {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .color-swatch:hover { transform: scale(1.15); }
+        .color-swatch.active {
+            border-color: #fff;
+            box-shadow: 0 0 12px rgba(255,255,255,0.3);
+        }
+        .color-custom {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            border: 2px dashed rgba(255,255,255,0.3);
+            cursor: pointer; background: none; padding: 0;
+            overflow: hidden; position: relative;
+        }
+        .color-custom input[type="color"] {
+            position: absolute; top: -4px; left: -4px;
+            width: 44px; height: 44px; border: none;
+            cursor: pointer; opacity: 0;
+        }
+        .color-custom-preview { width: 100%; height: 100%; border-radius: 50%; }
+        .kit-select { display: flex; flex-wrap: wrap; gap: 6px; }
+        .kit-option {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: var(--bg-deep);
+            color: var(--text-secondary);
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.82em; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .kit-option:hover { border-color: rgba(255,255,255,0.3); color: var(--text-primary); }
+        .kit-option.active { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
+        .deco-select { display: flex; flex-wrap: wrap; gap: 6px; }
+        .deco-option {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: var(--bg-deep);
+            color: var(--text-secondary);
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.82em; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .deco-option:hover { border-color: rgba(255,255,255,0.3); color: var(--text-primary); }
+        .deco-option.active { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
+        .save-btn {
+            padding: 12px 32px; border: none; border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent) 0%, #d4b812 100%);
+            color: #1a1a1f; font-family: 'Poppins', sans-serif;
+            font-weight: 700; font-size: 0.95em; cursor: pointer;
+            transition: all 0.25s;
+            box-shadow: 0 4px 16px rgba(var(--accent-rgb), 0.25);
+        }
+        .save-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(var(--accent-rgb), 0.35); }
+        .save-msg { display: inline-block; margin-left: 12px; font-size: 0.9em; opacity: 0; transition: opacity 0.3s; }
+        .save-msg.show { opacity: 1; }
+        .save-msg.success { color: #4ade80; }
+        .not-logged-in { text-align: center; padding: 80px 20px; color: var(--text-secondary); }
+        .not-logged-in h2 { color: var(--text-primary); margin-bottom: 12px; }
+        .not-logged-in a { color: var(--accent); font-weight: 600; }
+        .profile-loader {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            padding: 80px 20px;
+        }
+        .profile-loader-spinner {
+            width: 42px; height: 42px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: profile-spin 0.7s linear infinite;
+        }
+        @keyframes profile-spin { to { transform: rotate(360deg); } }
+        .profile-loader-text {
+            font-size: 0.9em;
+            color: rgba(255,255,255,0.4);
+            letter-spacing: 0.5px;
+        }
+        @media (max-width: 600px) {
+            .customize-panel { padding: 20px; }
+            .preview-card .player-modal-content { padding: 30px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <header class="main-header">
+        <div id="player-count-container" class="header-player-count"></div>
+        <h1 class="main-title">CZSK Tierlist</h1>
+        <div class="header-actions">
+            <a href="https://discord.gg/rAnR4hfKzw" class="discord-link" target="_blank">
+                <img src="kit_icons/discord.png" alt="Discord" class="discord-icon">
+                <span>Discord</span>
+            </a>
+        </div>
+    </header>
+
+    <div class="profile-wrapper">
+        <a href="overall.html" class="back-link">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            Zpět na tierlist
+        </a>
+
+        <div id="not-logged-in" class="not-logged-in" style="display:none;">
+            <h2>Nejsi přihlášen</h2>
+            <p>Pro zobrazení profilu se musíš <a href="login.html">přihlásit</a>.</p>
+        </div>
+
+        <div id="profile-content" style="display:none;">
+            <!-- Loading state -->
+            <div id="profile-loader" class="profile-loader">
+                <div class="profile-loader-spinner"></div>
+                <div class="profile-loader-text">Načítám tvůj profil...</div>
+            </div>
+            <!-- Live preview — same structure as the actual player modal -->
+            <div class="preview-card" id="profile-preview" style="display:none;">
+                <div class="player-modal-content" id="preview-modal">
+                    <div class="player-modal-banner" id="preview-banner"></div>
+                    <div class="avatar-deco-wrap" id="preview-deco-wrap">
+                    <img class="player-modal-skin" id="preview-skin" src="" alt="skin">
+                    <img class="avatar-deco-overlay" id="preview-deco-overlay" src="" alt="" style="display:none;">
+                    </div>
+                    <div class="player-modal-name" id="preview-name"></div>
+                    <div class="player-modal-bio" id="preview-bio" style="display:none;"></div>
+                    <div class="player-modal-position">
+                        <span class="player-modal-rank" id="preview-rank"></span>
+                        <span class="player-modal-score" id="preview-score"></span>
+                        <span class="player-modal-score-title" id="preview-score-title"></span>
+                    </div>
+                    <div class="player-modal-days" id="preview-days" style="display:none;"></div>
+                    <div class="player-modal-favkit" id="preview-favkit" style="display:none;"></div>
+                    <div class="player-modal-tiers" id="preview-tiers"></div>
+                    <div class="player-modal-achievements" id="preview-achievements"></div>
+                </div>
+            </div>
+
+            <!-- Customize Panel -->
+            <div class="customize-panel" id="profile-customize" style="display:none;">
+                <h2 class="customize-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    Upravit profil
+                </h2>
+
+                <div class="customize-row">
+                    <div class="customize-group" style="flex:2;">
+                        <div class="customize-label">Bio / Status</div>
+                        <input type="text" class="customize-input" id="edit-bio" maxlength="80" placeholder="Napiš něco o sobě...">
+                    </div>
+                    <div class="customize-group">
+                        <div class="customize-label">Oblíbený kit</div>
+                        <div class="kit-select" id="kit-select"></div>
+                    </div>
+                </div>
+
+                <div class="customize-row" id="deco-row" style="display:none;">
+                    <div class="customize-group">
+                        <div class="customize-label">Dekorace avataru</div>
+                        <div class="deco-select" id="deco-select"></div>
+                    </div>
+                </div>
+
+                <div class="customize-row" id="name-effect-row" style="display:none;">
+                    <div class="customize-group">
+                        <div class="customize-label">Efekt jména</div>
+                        <div class="deco-select" id="name-effect-select"></div>
+                    </div>
+                </div>
+
+                <div class="customize-row">
+                    <div class="customize-group">
+                        <div class="customize-label">Téma profilu</div>
+                        <div class="deco-select" id="theme-select"></div>
+                    </div>
+                </div>
+
+                <div class="customize-row">
+                    <div class="customize-group">
+                        <div class="customize-label">Barva banneru</div>
+                        <div class="color-picker-row" id="banner-colors"></div>
+                    </div>
+                    <div class="customize-group">
+                        <div class="customize-label">Barva akcentu</div>
+                        <div class="color-picker-row" id="accent-colors"></div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 8px;">
+                    <button class="save-btn" id="save-btn">Uložit změny</button>
+                    <span class="save-msg" id="save-msg"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script>
+        if (typeof FIREBASE_CONFIG !== 'undefined' && FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.startsWith('PASTE')) {
+            firebase.initializeApp(FIREBASE_CONFIG);
+        }
+    </script>
+    <script src="js/auth.js"></script>
+    <script>
+    (async function() {
+        var KITS = ['Crystal','Axe','UHC','Sword','Pot','SMP','Npot','DiaSMP','Mace'];
+        var KIT_ICONS = {
+            'Crystal':'kit_icons/cpvp.png','Axe':'kit_icons/axe.png','Sword':'kit_icons/sword.png',
+            'UHC':'kit_icons/uhc.png','Npot':'kit_icons/npot.png','Pot':'kit_icons/pot.png',
+            'SMP':'kit_icons/smp.png','DiaSMP':'kit_icons/diasmp.png','Mace':'kit_icons/mace.png',
+            'Speed':'kit_icons/speed.png','OGV':'kit_icons/OGV.png','Cart':'kit_icons/cart.png',
+            'Creeper':'kit_icons/creeper.png','DiaVanilla':'kit_icons/diavanilla.png'
+        };
+        var ALL_KITS = ['Crystal','Axe','UHC','Sword','Pot','SMP','Npot','DiaSMP','Mace','Speed','OGV','Cart','Creeper','DiaVanilla'];
+        var BANNER_PRESETS = [
+            'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+            'linear-gradient(135deg, #2d1b69 0%, #11998e 100%)',
+            'linear-gradient(135deg, #1f1c2c 0%, #928dab 100%)',
+            'linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 100%)',
+            'linear-gradient(135deg, #141e30 0%, #243b55 100%)',
+            'linear-gradient(135deg, #360033 0%, #0b8793 100%)',
+            'linear-gradient(135deg, #4a0e0e 0%, #cc5500 100%)',
+            'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
+            'linear-gradient(135deg, #000428 0%, #004e92 100%)',
+            'linear-gradient(135deg, #1d4350 0%, #a43931 100%)',
+        ];
+        var ACCENT_PRESETS = ['#eecd14','#ff6b6b','#51cf66','#339af0','#cc5de8','#ff922b','#20c997','#f06595','#748ffc','#ffffff'];
+        var TIER_VALUE_MAP = {
+            '60':'HT1','48':'LT1','32':'HT2','24':'LT2','16':'HT3','10':'LT3','5':'HT4','3':'LT4','2':'HT5','1':'LT5',
+            '54':'RHT1','43':'RLT1','29':'RHT2','22':'RLT2'
+        };
+        var TIER_COLORS = {
+            '60':'#FFCF4A','48':'#D5B355','32':'#A4B3C7','24':'#888D95','16':'#8F5931',
+            '10':'#B56326','5':'#655B79','3':'#655B79','2':'#655B79','1':'#655B79',
+            '54':'#FFCF4A','43':'#D5B355','29':'#A4B3C7','22':'#888D95'
+        };
+
+        var auth = CZSKAuth.getCurrentUser();
+        if (!auth || !auth.nick) {
+            document.getElementById('not-logged-in').style.display = 'block';
+            return;
+        }
+        document.getElementById('profile-content').style.display = 'block';
+        var nick = auth.nick;
+
+        // Load data from the same XLSX as overall page
+        var playerData = null; // { nick, score, position, tiers: [{tier, icon, kit}], discordId }
+        var tierHistory = {};
+        try {
+            var resp = await fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx&_=' + Date.now());
+            var data = await resp.arrayBuffer();
+            var wb = XLSX.read(data, { type: 'array' });
+
+            // Parse TierHistory first
+            var histSheet = wb.Sheets['TierHistory'];
+            if (histSheet) {
+                var histRows = XLSX.utils.sheet_to_json(histSheet);
+                var iconMap = {
+                    'Crystal':'kit_icons/cpvp.png','Axe':'kit_icons/axe.png','Sword':'kit_icons/sword.png',
+                    'UHC':'kit_icons/uhc.png','NPot':'kit_icons/npot.png','Npot':'kit_icons/npot.png',
+                    'Pot':'kit_icons/pot.png','SMP':'kit_icons/smp.png','DiaSMP':'kit_icons/diasmp.png',
+                    'Mace':'kit_icons/mace.png','Speed':'kit_icons/speed.png','OGV':'kit_icons/OGV.png',
+                    'Cart':'kit_icons/cart.png','Creeper':'kit_icons/creeper.png','DiaVanilla':'kit_icons/diavanilla.png'
+                };
+                histRows.forEach(function(row) {
+                    if (!row.Kit || !row.Tier) return;
+                    var did = row['Discord ID'] ? String(row['Discord ID']).trim() : null;
+                    if (!did) return;
+                    var kit = String(row.Kit).trim();
+                    var icon = iconMap[kit] || null;
+                    if (!icon) return;
+                    if (!tierHistory[did]) tierHistory[did] = {};
+                    if (!tierHistory[did][icon]) tierHistory[did][icon] = [];
+                    tierHistory[did][icon].push({
+                        tier: String(row.Tier).trim(),
+                        kit: kit,
+                        oldTier: row.OldTier ? String(row.OldTier).trim() : null,
+                        date: row.Date ? String(row.Date).trim() : null
+                    });
+                });
+            }
+
+            // Parse main sheet - find the player
+            var sheet = wb.Sheets[wb.SheetNames[0]];
+            var rows = XLSX.utils.sheet_to_json(sheet);
+            // Build all players for position calculation
+            var allPlayers = [];
+            rows.forEach(function(row) {
+                var pNick = row['Nick'] ? String(row['Nick']).trim() : null;
+                if (!pNick) return;
+                var score = 0;
+                var tiers = [];
+                var discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : '';
+                for (var kit in KIT_ICONS) {
+                    var val = row[kit];
+                    if (val !== undefined && val !== null && val !== '' && val !== '-') {
+                        var tv = String(val).trim();
+                        // resolve text to number
+                        var numMap = {'HT1':'60','LT1':'48','HT2':'32','LT2':'24','HT3':'16','LT3':'10','HT4':'5','LT4':'3','HT5':'2','LT5':'1','RHT1':'54','RLT1':'43','RHT2':'29','RLT2':'22'};
+                        var numVal = numMap[tv.toUpperCase()] || tv;
+                        var n = parseInt(numVal);
+                        if (!isNaN(n)) {
+                            score += n;
+                            tiers.push({ tier: String(n), icon: KIT_ICONS[kit], kit: kit });
+                        }
+                    }
+                }
+                allPlayers.push({ nick: pNick, score: score, tiers: tiers, discordId: discordId });
+            });
+
+            // Sort and find position
+            allPlayers.sort(function(a, b) { return b.score - a.score || a.nick.localeCompare(b.nick); });
+            var position = 0;
+            var lastScore = -1, lastRank = 0;
+            for (var i = 0; i < allPlayers.length; i++) {
+                if (allPlayers[i].score !== lastScore) {
+                    lastRank = i + 1;
+                    lastScore = allPlayers[i].score;
+                }
+                if (allPlayers[i].nick.toLowerCase() === nick.toLowerCase()) {
+                    playerData = allPlayers[i];
+                    position = lastRank;
+                    break;
+                }
+            }
+            if (playerData) playerData.position = position;
+        } catch(e) {
+            console.warn('Failed loading data:', e);
+        }
+
+        // Score title
+        function getScoreTitle(s) {
+            if (s >= 300) return { title: 'Legenda', color: '#FFCF4A' };
+            if (s >= 200) return { title: 'Elita', color: '#A4B3C7' };
+            if (s >= 100) return { title: 'Šampion', color: '#8F5931' };
+            if (s >= 50)  return { title: 'Bojovník', color: '#6366f1' };
+            return { title: 'Nováček', color: '#655B79' };
+        }
+
+        function parseCzechDate(str) {
+            if (!str) return null;
+            var m = str.match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/);
+            if (!m) return null;
+            return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1])).getTime();
+        }
+
+        function computeAchievements(pData) {
+            var achievements = [];
+            var validTiers = (pData.tiers || []).filter(function(t) { return t.tier && t.tier !== '-'; });
+            var testedKits = validTiers.length;
+            var pNick = pData.nick || '';
+            var pos = pData.position || 0;
+            var score = pData.score || 0;
+            var did = pData.discordId || '';
+
+            if (pNick === 'ownedbyshifty') achievements.push({ label: 'Exekutor', desc: 'První tester', color: '#5adc26' });
+            if (pNick === 'EBAN92') achievements.push({ label: 'Eban', desc: 'Stvořitel tierlistu', color: '#ff0000' });
+            if (pNick === 'Fleyz') achievements.push({ label: 'Fleyz', desc: 'Spolumajitel, vytvořil bota a stránky', color: '#eb9525' });
+
+            if (pos === 1) achievements.push({ label: '#1', desc: '1. místo', color: '#eecd14' });
+            else if (pos === 2) achievements.push({ label: '#2', desc: '2. místo', color: '#c0c0c0' });
+            else if (pos === 3) achievements.push({ label: '#3', desc: '3. místo', color: '#cd7f32' });
+            if (pos >= 4 && pos <= 10) achievements.push({ label: 'Top 10', desc: 'Umístění v top 10', color: '#6366f1' });
+
+            if (validTiers.some(function(t) { return String(t.tier) === '60'; })) achievements.push({ label: 'Kit Master', desc: 'Dosáhl HT1', color: '#FFCF4A' });
+            var eliteCount = validTiers.filter(function(t) { return ['32','48','60'].indexOf(String(t.tier)) >= 0; }).length;
+            if (eliteCount >= 3) achievements.push({ label: 'Elite', desc: '3+ kity na HT2+', color: '#f97316' });
+            if (testedKits >= KITS.length && KITS.length > 0) achievements.push({ label: 'All-kits', desc: 'Testován ve všech kitech', color: '#34d399' });
+            if (score === 1) achievements.push({ label: 'První kroky', desc: 'Získal první bod', color: '#94a3b8' });
+
+            var earliestDate = Infinity, totalTestCount = 0;
+            if (did && tierHistory[did]) {
+                for (var icon in tierHistory[did]) {
+                    var entries = tierHistory[did][icon];
+                    totalTestCount += entries.length;
+                    for (var e = 0; e < entries.length; e++) {
+                        var ts = parseCzechDate(entries[e].date);
+                        if (ts && ts < earliestDate) earliestDate = ts;
+                    }
+                }
+                var daysSince = (Date.now() - earliestDate) / (24 * 60 * 60 * 1000);
+                if (daysSince / 365.25 >= 2) achievements.push({ label: '2+ roky', desc: 'Na tierlistu 2+ roky', color: '#f59e0b' });
+                if (daysSince >= 1000) achievements.push({ label: 'Unc', desc: '1000+ dní na tierlistu', color: '#7c3aed' });
+            }
+            if (totalTestCount >= 50) achievements.push({ label: '50+ testů', desc: '50+ testů', color: '#14b8a6' });
+            if (totalTestCount >= 100) achievements.push({ label: '100+ testů', desc: '100+ testů', color: '#0ea5e9' });
+            if (totalTestCount >= 200) achievements.push({ label: '200+ testů', desc: '200+ testů', color: '#8b5cf6' });
+            return achievements;
+        }
+
+        // Card settings
+        var SETTINGS_KEY = 'czsktiers_card_' + nick.toLowerCase();
+        var settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+
+        // Try loading from Firestore (if saved there before)
+        try {
+            var db = firebase.firestore();
+            var fsDoc = await db.collection('cardSettings').doc(nick.toLowerCase()).get();
+            if (fsDoc.exists) {
+                var fsData = fsDoc.data();
+                // Merge Firestore data (takes priority)
+                if (fsData.banner) settings.banner = fsData.banner;
+                if (fsData.accent) settings.accent = fsData.accent;
+                if (fsData.bio !== undefined) settings.bio = fsData.bio;
+                if (fsData.favoriteKit !== undefined) settings.favoriteKit = fsData.favoriteKit;
+                if (fsData.decoration !== undefined) settings.decoration = fsData.decoration;
+                if (fsData.nameEffect !== undefined) settings.nameEffect = fsData.nameEffect;
+                if (fsData.theme !== undefined) settings.theme = fsData.theme;
+            }
+        } catch(e) { console.warn('Firestore load:', e); }
+
+        if (!settings.banner) settings.banner = BANNER_PRESETS[0];
+        if (!settings.accent) settings.accent = '#eecd14';
+        if (!settings.bio) settings.bio = '';
+        if (!settings.favoriteKit) settings.favoriteKit = '';
+        if (!settings.decoration) settings.decoration = '';
+        if (!settings.nameEffect) settings.nameEffect = '';
+        if (!settings.theme) settings.theme = '';
+
+        // Hide loader, show actual content
+        document.getElementById('profile-loader').style.display = 'none';
+        document.getElementById('profile-preview').style.display = '';
+        document.getElementById('profile-customize').style.display = '';
+
+        // Render the preview (looks exactly like the modal)
+        function renderPreview() {
+            var content = document.getElementById('preview-modal');
+            var banner = document.getElementById('preview-banner');
+            var skinEl = document.getElementById('preview-skin');
+            var nameEl = document.getElementById('preview-name');
+            var bioEl = document.getElementById('preview-bio');
+            var rankEl = document.getElementById('preview-rank');
+            var scoreEl = document.getElementById('preview-score');
+            var scoreTitleEl = document.getElementById('preview-score-title');
+            var daysEl = document.getElementById('preview-days');
+            var favkitEl = document.getElementById('preview-favkit');
+            var tiersEl = document.getElementById('preview-tiers');
+            var achEl = document.getElementById('preview-achievements');
+
+            // Banner
+            if (settings.banner) {
+                banner.style.background = settings.banner;
+                banner.style.display = '';
+            } else {
+                banner.style.display = 'none';
+            }
+
+            // Content border
+            if (settings.accent) {
+                content.style.borderColor = settings.accent + '33';
+            }
+
+            // Skin
+            skinEl.src = 'https://mc-heads.net/avatar/' + encodeURIComponent(nick) + '/96';
+
+            // Name
+            nameEl.textContent = nick;
+            nameEl.style.color = settings.accent || '';
+
+            // Bio
+            if (settings.bio) {
+                bioEl.textContent = settings.bio;
+                bioEl.style.display = '';
+            } else {
+                bioEl.style.display = 'none';
+            }
+
+            // Rank + Score
+            var pos = playerData ? playerData.position : 0;
+            var score = playerData ? playerData.score : 0;
+            rankEl.textContent = pos ? pos + '.' : '?';
+            rankEl.className = 'player-modal-rank';
+            if (pos === 1) rankEl.classList.add('rank-1');
+            else if (pos === 2) rankEl.classList.add('rank-2');
+            else if (pos === 3) rankEl.classList.add('rank-3');
+            scoreEl.textContent = score + ' points';
+            var st = getScoreTitle(score);
+            scoreTitleEl.textContent = st.title;
+            scoreTitleEl.style.color = st.color;
+
+            // Days on tierlist
+            var discordId = playerData ? playerData.discordId : '';
+            if (discordId && tierHistory[discordId]) {
+                var earliest = Infinity;
+                for (var icon in tierHistory[discordId]) {
+                    for (var e = 0; e < tierHistory[discordId][icon].length; e++) {
+                        var ts = parseCzechDate(tierHistory[discordId][icon][e].date);
+                        if (ts && ts < earliest) earliest = ts;
+                    }
+                }
+                if (earliest < Infinity) {
+                    var days = Math.floor((Date.now() - earliest) / (24 * 60 * 60 * 1000));
+                    daysEl.textContent = days + ' dni na tierlistu';
+                    daysEl.style.display = '';
+                } else {
+                    daysEl.style.display = 'none';
+                }
+            } else {
+                daysEl.style.display = 'none';
+            }
+
+            // Favorite kit
+            if (settings.favoriteKit) {
+                var kitIconPath = KIT_ICONS[settings.favoriteKit] || '';
+                var iconHtml = kitIconPath ? '<img class="favkit-icon" src="' + kitIconPath + '" alt="">' : '';
+                favkitEl.innerHTML = '<span class="favkit-label">Oblíbený kit:</span> ' + iconHtml + '<span class="favkit-value">' + settings.favoriteKit + '</span>';
+                if (settings.accent) favkitEl.querySelector('.favkit-value').style.color = settings.accent;
+                favkitEl.style.display = '';
+            } else {
+                favkitEl.style.display = 'none';
+            }
+
+            // Avatar decoration (image overlay + glow)
+            var decoWrap = document.getElementById('preview-deco-wrap');
+            var decoOverlay = document.getElementById('preview-deco-overlay');
+            if (decoWrap) {
+                decoWrap.removeAttribute('data-deco');
+                if (decoOverlay) { decoOverlay.style.display = 'none'; decoOverlay.src = ''; }
+                if (settings.decoration) {
+                    decoWrap.setAttribute('data-deco', settings.decoration);
+                    if (decoOverlay) {
+                        decoOverlay.src = 'decorations/' + settings.decoration + '.png';
+                        decoOverlay.style.display = '';
+                        decoOverlay.onerror = function() { decoOverlay.style.display = 'none'; };
+                    }
+                }
+            }
+
+            // Name effect
+            nameEl.className = 'player-modal-name';
+            if (settings.nameEffect) {
+                nameEl.classList.add('name-effect-' + settings.nameEffect);
+                if (settings.nameEffect === 'gradient' || settings.nameEffect === 'rainbow') {
+                    nameEl.style.color = '';
+                }
+            }
+
+            // Profile theme
+            content.removeAttribute('data-theme');
+            if (settings.theme) {
+                content.setAttribute('data-theme', settings.theme);
+            }
+
+            // Tiers (same badge style as overall)
+            var tiers = playerData ? playerData.tiers : [];
+            var tiersHtml = '';
+            var sorted = tiers.slice().sort(function(a, b) {
+                var order = ['60','48','32','24','16','10','5','3','2','1','54','43','29','22'];
+                return order.indexOf(a.tier) - order.indexOf(b.tier);
+            });
+            sorted.forEach(function(t) {
+                var tierText = TIER_VALUE_MAP[t.tier] || '-';
+                var isRetired = ['54','43','29','22'].indexOf(t.tier) >= 0;
+                var color = TIER_COLORS[t.tier] || '#EEE0CB';
+                var bg = isRetired ? '#23242a' : color;
+                var fg = isRetired ? color : '#23242a';
+                tiersHtml += '<span class="kit-badge" style="--tier-color:' + color + ';">' +
+                    '<span class="kit-icon-circle" style="border-color:' + bg + ';">' +
+                    '<img src="' + t.icon + '" alt="" class="kit-icon" loading="lazy">' +
+                    '</span>' +
+                    '<span class="kit-tier-text" style="background:' + bg + ';color:' + fg + ';">' + tierText.replace(/^R/, '') + '</span>' +
+                    '</span>';
+            });
+            tiersEl.innerHTML = tiersHtml;
+
+            // Achievements
+            if (playerData) {
+                var achList = computeAchievements(playerData);
+                if (achList.length > 0) {
+                    achEl.innerHTML = achList.map(function(a) {
+                        return '<span class="achievement-badge" style="--ach-color:' + a.color + ';">' + a.label + '<span class="ach-tip">' + a.desc + '</span></span>';
+                    }).join('');
+                    achEl.style.display = '';
+                } else {
+                    achEl.innerHTML = '';
+                    achEl.style.display = 'none';
+                }
+            }
+        }
+
+        // Build customize controls
+        function buildCustomize() {
+            document.getElementById('edit-bio').value = settings.bio || '';
+
+            // Kit select
+            var kitHtml = '<div class="kit-option' + (!settings.favoriteKit ? ' active' : '') + '" data-kit="">Žádný</div>';
+            ALL_KITS.forEach(function(k) {
+                kitHtml += '<div class="kit-option' + (settings.favoriteKit === k ? ' active' : '') + '" data-kit="' + k + '">' + k + '</div>';
+            });
+            document.getElementById('kit-select').innerHTML = kitHtml;
+
+            // Decoration select
+            var DECO_OPTIONS = [
+                { key: '', label: 'Žádná' },
+                { key: 'diamond', label: 'Diamant' },
+                { key: 'enchant', label: 'Enchant' },
+                { key: 'fire', label: 'Oheň' },
+                { key: 'catears', label: 'Kočičí uši' },
+                { key: 'sakura', label: 'Sakura' },
+                { key: 'crown', label: 'Koruna' },
+                { key: 'netherite', label: 'Netherite' },
+                { key: 'ender', label: 'Ender' },
+                { key: 'lightning', label: 'Blesk' }
+            ];
+            var decoHtml = '';
+            DECO_OPTIONS.forEach(function(d) {
+                decoHtml += '<div class="deco-option' + (settings.decoration === d.key ? ' active' : '') + '" data-deco="' + d.key + '">' + d.label + '</div>';
+            });
+            document.getElementById('deco-select').innerHTML = decoHtml;
+
+            // Name effect select
+            var NAME_EFFECT_OPTIONS = [
+                { key: '', label: 'Žádný' },
+                { key: 'gradient', label: 'Gradient' },
+                { key: 'rainbow', label: 'Rainbow' },
+                { key: 'glitch', label: 'Glitch' },
+                { key: 'glow', label: 'Glow' },
+                { key: 'typewriter', label: 'Typewriter' }
+            ];
+            var neHtml = '';
+            NAME_EFFECT_OPTIONS.forEach(function(ne) {
+                neHtml += '<div class="deco-option' + (settings.nameEffect === ne.key ? ' active' : '') + '" data-nameeffect="' + ne.key + '">' + ne.label + '</div>';
+            });
+            document.getElementById('name-effect-select').innerHTML = neHtml;
+
+            // Theme select
+            var THEME_OPTIONS = [
+                { key: '', label: 'Výchozí' },
+                { key: 'neon', label: 'Neon' },
+                { key: 'dark', label: 'Dark' },
+                { key: 'retro', label: 'Retro' },
+                { key: 'minecraft', label: 'Minecraft' }
+            ];
+            var themeHtml = '';
+            THEME_OPTIONS.forEach(function(th) {
+                themeHtml += '<div class="deco-option' + (settings.theme === th.key ? ' active' : '') + '" data-theme="' + th.key + '">' + th.label + '</div>';
+            });
+            document.getElementById('theme-select').innerHTML = themeHtml;
+
+            // Banner colors
+            var bannerHtml = '';
+            BANNER_PRESETS.forEach(function(b) {
+                bannerHtml += '<div class="color-swatch' + (settings.banner === b ? ' active' : '') + '" data-banner="' + b + '" style="background:' + b + '"></div>';
+            });
+            document.getElementById('banner-colors').innerHTML = bannerHtml;
+
+            // Accent colors
+            var accentHtml = '';
+            ACCENT_PRESETS.forEach(function(c) {
+                accentHtml += '<div class="color-swatch' + (settings.accent === c ? ' active' : '') + '" data-accent="' + c + '" style="background:' + c + '"></div>';
+            });
+            var hasCustom = ACCENT_PRESETS.indexOf(settings.accent) === -1;
+            accentHtml += '<div class="color-custom" title="Vlastní barva"><div class="color-custom-preview" style="background:' + (hasCustom ? settings.accent : '#555') + '"></div><input type="color" value="' + settings.accent + '"></div>';
+            document.getElementById('accent-colors').innerHTML = accentHtml;
+
+            // Events
+            document.querySelectorAll('.kit-option').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    document.querySelectorAll('.kit-option').forEach(function(e) { e.classList.remove('active'); });
+                    el.classList.add('active');
+                    settings.favoriteKit = el.dataset.kit;
+                    renderPreview();
+                });
+            });
+            document.querySelectorAll('[data-banner]').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    document.querySelectorAll('[data-banner]').forEach(function(e) { e.classList.remove('active'); });
+                    el.classList.add('active');
+                    settings.banner = el.dataset.banner;
+                    renderPreview();
+                });
+            });
+            document.querySelectorAll('[data-accent]').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    document.querySelectorAll('[data-accent]').forEach(function(e) { e.classList.remove('active'); });
+                    document.querySelector('.color-custom-preview').style.background = '#555';
+                    el.classList.add('active');
+                    settings.accent = el.dataset.accent;
+                    renderPreview();
+                });
+            });
+            var customInput = document.querySelector('.color-custom input[type="color"]');
+            if (customInput) {
+                customInput.addEventListener('input', function() {
+                    document.querySelectorAll('[data-accent]').forEach(function(e) { e.classList.remove('active'); });
+                    document.querySelector('.color-custom-preview').style.background = customInput.value;
+                    settings.accent = customInput.value;
+                    renderPreview();
+                });
+            }
+            document.getElementById('edit-bio').addEventListener('input', function() {
+                settings.bio = this.value;
+                renderPreview();
+            });
+            // Decoration events
+            document.querySelectorAll('.deco-option[data-deco]').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    document.querySelectorAll('.deco-option[data-deco]').forEach(function(e) { e.classList.remove('active'); });
+                    el.classList.add('active');
+                    settings.decoration = el.dataset.deco;
+                    renderPreview();
+                });
+            });
+            // Name effect events
+            document.querySelectorAll('[data-nameeffect]').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    document.querySelectorAll('[data-nameeffect]').forEach(function(e) { e.classList.remove('active'); });
+                    el.classList.add('active');
+                    settings.nameEffect = el.dataset.nameeffect;
+                    renderPreview();
+                });
+            });
+            // Theme events
+            document.querySelectorAll('[data-theme]').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    document.querySelectorAll('[data-theme]').forEach(function(e) { e.classList.remove('active'); });
+                    el.classList.add('active');
+                    settings.theme = el.dataset.theme;
+                    renderPreview();
+                });
+            });
+        }
+
+        // Save
+        document.getElementById('save-btn').addEventListener('click', async function() {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+            // Also save to Firestore for public visibility
+            try {
+                var db = firebase.firestore();
+                await db.collection('cardSettings').doc(nick.toLowerCase()).set({
+                    banner: settings.banner || '',
+                    accent: settings.accent || '',
+                    bio: settings.bio || '',
+                    favoriteKit: settings.favoriteKit || '',
+                    decoration: settings.decoration || '',
+                    nameEffect: settings.nameEffect || '',
+                    theme: settings.theme || ''
+                });
+            } catch(e) { console.warn('Firestore save:', e); }
+            var msg = document.getElementById('save-msg');
+            msg.textContent = '✓ Uloženo!';
+            msg.className = 'save-msg show success';
+            setTimeout(function() { msg.className = 'save-msg'; }, 2000);
+        });
+
+        buildCustomize();
+        renderPreview();
+    })();
+    </script>
+</body>
+</html>
