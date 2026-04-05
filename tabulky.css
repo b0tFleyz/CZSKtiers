@@ -201,6 +201,57 @@
   outline: 2px solid #ffe066;
   transition: background 0.2s, box-shadow 0.2s, outline 0.2s, color 0.2s;
 }
+
+/* Retired toggle */
+.retired-toggle-wrap {
+  text-align: center;
+  margin-bottom: 18px;
+}
+.retired-toggle-btn {
+  background: #23242a;
+  color: #aaa;
+  border: 2px solid #444;
+  border-radius: 10px;
+  padding: 7px 18px;
+  font-size: 0.95em;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  font-family: inherit;
+}
+.retired-toggle-btn:hover {
+  border-color: #888;
+  color: #fff;
+}
+.retired-toggle-btn.active {
+  background: #3a1c1c;
+  color: #ff6b6b;
+  border-color: #ff6b6b;
+}
+.retired-toggle-icon {
+  font-weight: bold;
+  font-size: 1.05em;
+}
+/* Retired player card */
+.kit-player-retired {
+  opacity: 0.6;
+  position: relative;
+}
+.kit-player-retired:hover {
+  opacity: 0.85;
+}
+.retired-badge {
+  display: inline-block;
+  background: #ff6b6b;
+  color: #fff;
+  font-weight: bold;
+  font-size: 0.72em;
+  border-radius: 5px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: 0.5px;
+}
+}
 .nav-btn.active img {
   filter: brightness(1.2) drop-shadow(0 0 6px #ffe066);
 }

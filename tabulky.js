@@ -18,6 +18,11 @@ const PEAK_TIER_SCORE = {
 
 function resolveTierValue(tier) {
     tier = String(tier).trim();
+    // Handle "LT3 + Evaluation", "LT3 + Eval", "Evaluation" etc.
+    const upper = tier.toUpperCase();
+    if (upper.includes('EVAL')) {
+        return '10'; // LT3
+    }
     const validNums = ['1','2','3','5','10','16','24','32','48','60','22','29','43','54'];
     if (validNums.includes(tier)) return tier;
     const textMap = {
@@ -25,7 +30,7 @@ function resolveTierValue(tier) {
         'LT3':'10','HT4':'5','LT4':'3','HT5':'2','LT5':'1',
         'RHT1':'54','RLT1':'43','RHT2':'29','RLT2':'22'
     };
-    return textMap[tier.toUpperCase()] || null;
+    return textMap[upper] || null;
 }
 
 // Parses Czech locale date string "D. M. YYYY" or "D.M.YYYY" into a timestamp
@@ -244,6 +249,464 @@ function computeAchievements({ name, position, score, tiers, discordId, hallOfFa
     return achievements;
 }
 
+// ---- Rank History ----
+
+function _rhEscape(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _rhRankColor(rank) {
+    if (rank === 1) return '#FFCF4A';
+    if (rank <= 3) return '#D5B355';
+    if (rank <= 10) return '#A4B3C7';
+    if (rank <= 20) return '#8F5931';
+    return '#655B79';
+}
+
+function computeRankHistory(targetDiscordId) {
+    if (!targetDiscordId) return [];
+
+    var PEAK_REQUIRED_DAYS = { 'HT3': 30, 'LT2': 60, 'HT2': 60, 'LT1': 90, 'HT1': 90 };
+    var DAY_MS = 24 * 60 * 60 * 1000;
+
+    // Pre-compute peak tier earned timestamps for every player/kit
+    var playerPeakEarned = {}; // discordId -> { kitIcon -> { score, earnedTs } }
+    for (var did in tierHistory) {
+        playerPeakEarned[did] = {};
+        for (var kitIcon in tierHistory[did]) {
+            var history = tierHistory[did][kitIcon];
+            if (!history.length) continue;
+            var sorted = history
+                .map(function(e) { return Object.assign({}, e, { ts: parseCzechDate(e.date) }); })
+                .sort(function(a, b) { return (a.ts || 0) - (b.ts || 0); });
+            var bestOrder = 999, bestScore = 0, bestEarnedTs = 0;
+            for (var i = 0; i < sorted.length; i++) {
+                var entry = sorted[i];
+                var tier = String(entry.tier || '').trim();
+                if (!tier || tier.startsWith('R')) continue;
+                if (!PEAK_REQUIRED_DAYS[tier]) continue;
+                var oldTier = String(entry.oldTier || '').trim();
+                if (oldTier === tier) continue;
+                var startDate = entry.ts;
+                if (!startDate) continue;
+                var endDate = Date.now();
+                for (var j = i + 1; j < sorted.length; j++) {
+                    var next = sorted[j];
+                    if (String(next.oldTier || '').trim() === tier && next.ts) {
+                        endDate = next.ts;
+                        break;
+                    }
+                }
+                var heldDays = (endDate - startDate) / DAY_MS;
+                if (heldDays >= PEAK_REQUIRED_DAYS[tier]) {
+                    var tierVal = resolveTierValue(tier);
+                    if (tierVal) {
+                        var order = getTierOrder(tierVal);
+                        if (order < bestOrder) {
+                            bestOrder = order;
+                            bestScore = PEAK_TIER_SCORE[tier] || 0;
+                            bestEarnedTs = startDate + PEAK_REQUIRED_DAYS[tier] * DAY_MS;
+                        }
+                    }
+                }
+            }
+            if (bestScore > 0) {
+                playerPeakEarned[did][kitIcon] = { score: bestScore, earnedTs: bestEarnedTs };
+            }
+        }
+    }
+
+    // Compute kit introduction dates from tier history (earliest event per kit)
+    var kitIntroDate = {};
+    for (var did3 in tierHistory) {
+        for (var ki in tierHistory[did3]) {
+            tierHistory[did3][ki].forEach(function(entry) {
+                var ts = parseCzechDate(entry.date);
+                if (ts && (!kitIntroDate[ki] || ts < kitIntroDate[ki])) {
+                    kitIntroDate[ki] = ts;
+                }
+            });
+        }
+    }
+
+    // Build current kit states for all players
+    var playerKitVals = {};
+    var playerScores = {};
+
+    allPlayers.forEach(function(p) {
+        if (!p.discordId) return;
+        playerKitVals[p.discordId] = {};
+        p.tiers.forEach(function(t) {
+            playerKitVals[p.discordId][t.icon] = parseInt(t.tier) || 0;
+        });
+    });
+
+    // Include players from tierHistory not in allPlayers (blacklisted/removed)
+    for (var did2 in tierHistory) {
+        if (!playerKitVals[did2]) {
+            playerKitVals[did2] = {};
+            for (var ki2 in tierHistory[did2]) {
+                var entries = tierHistory[did2][ki2];
+                if (!entries.length) continue;
+                var latestTs = 0, latestTier = null;
+                entries.forEach(function(e) {
+                    var ts = parseCzechDate(e.date);
+                    if (ts && ts > latestTs) { latestTs = ts; latestTier = e.tier; }
+                });
+                if (latestTier) {
+                    var val2 = parseInt(resolveTierValue(latestTier)) || 0;
+                    playerKitVals[did2][ki2] = val2;
+                }
+            }
+        }
+    }
+
+    // Time-aware score: only count kits that existed at atTs, peak bonus only if earned
+    function calcScore(discordId, atTs) {
+        var s = 0;
+        var kits = playerKitVals[discordId] || {};
+        var pe = playerPeakEarned[discordId] || {};
+        for (var kit in kits) {
+            // Skip kits that didn't exist yet at this timestamp
+            if (kitIntroDate[kit] && atTs < kitIntroDate[kit]) continue;
+            var peakScore = 0;
+            if (pe[kit] && atTs >= pe[kit].earnedTs) {
+                peakScore = pe[kit].score;
+            }
+            s += Math.max(kits[kit] || 0, peakScore);
+        }
+        return s;
+    }
+
+    function recalcAllScores(atTs) {
+        for (var id in playerKitVals) {
+            playerScores[id] = calcScore(id, atTs);
+        }
+    }
+
+    recalcAllScores(Date.now());
+
+    function getRank() {
+        var ts = playerScores[targetDiscordId];
+        if (ts === undefined || ts <= 0) return null;
+        var rank = 1;
+        for (var d in playerScores) {
+            if (d !== targetDiscordId && playerScores[d] > ts) rank++;
+        }
+        return rank;
+    }
+
+    // Collect ALL tier events from ALL players
+    var allEvts = [];
+    for (var dId in tierHistory) {
+        for (var kitIcon2 in tierHistory[dId]) {
+            tierHistory[dId][kitIcon2].forEach(function(entry) {
+                var ts = parseCzechDate(entry.date);
+                if (ts) {
+                    allEvts.push({
+                        discordId: dId, kitIcon: kitIcon2,
+                        tier: entry.tier, oldTier: entry.oldTier,
+                        date: entry.date, ts: ts
+                    });
+                }
+            });
+        }
+    }
+
+    // Sort newest-first (walk backward)
+    allEvts.sort(function(a, b) { return b.ts - a.ts; });
+
+    var rawHistory = [];
+    var currentRank = getRank();
+    if (currentRank !== null) {
+        rawHistory.push({ ts: Date.now(), date: new Date().toLocaleDateString('cs-CZ'), rank: currentRank });
+    }
+
+    // Walk backward
+    for (var i2 = 0; i2 < allEvts.length; i2++) {
+        var evt = allEvts[i2];
+        if (!playerKitVals[evt.discordId]) continue;
+        var oldVal = evt.oldTier ? (parseInt(resolveTierValue(evt.oldTier)) || 0) : 0;
+        playerKitVals[evt.discordId][evt.kitIcon] = oldVal;
+        recalcAllScores(evt.ts);
+        var rank = getRank();
+        if (rank !== null) {
+            rawHistory.push({ ts: evt.ts, date: evt.date, rank: rank });
+        }
+    }
+
+    rawHistory.reverse(); // chronological
+
+    // Consolidate by date (keep last entry per date)
+    var byDate = {};
+    var dateOrder = [];
+    rawHistory.forEach(function(h) {
+        if (!byDate[h.date]) dateOrder.push(h.date);
+        byDate[h.date] = h;
+    });
+    var historyResult = dateOrder.map(function(d) { return byDate[d]; });
+
+    // Remove consecutive duplicates (keep endpoints and rank-changes)
+    if (historyResult.length > 2) {
+        var filtered = [historyResult[0]];
+        for (var j2 = 1; j2 < historyResult.length - 1; j2++) {
+            if (historyResult[j2].rank !== historyResult[j2-1].rank || historyResult[j2].rank !== historyResult[j2+1].rank) {
+                filtered.push(historyResult[j2]);
+            }
+        }
+        filtered.push(historyResult[historyResult.length - 1]);
+        historyResult = filtered;
+    }
+
+    return { history: historyResult, kitIntroDate: kitIntroDate };
+}
+
+function renderRankHistoryChart(container, history, kitIntroDate) {
+    container.innerHTML = '';
+
+    // Scrollable wider chart — min 80px per data point, min 700
+    var PL = 56, PR = 24, PT = 50, PB = 44;
+    var BASE_SVG_W = Math.max(700, history.length * 80) + PL + PR;
+    var SVG_H = 360;
+    var BASE_PLOT_W = BASE_SVG_W - PL - PR;
+    var PLOT_H = SVG_H - PT - PB;
+
+    var ranks = history.map(function(h) { return h.rank; });
+    var dataMinRank = Math.min.apply(null, ranks);
+    var dataMaxRank = Math.max.apply(null, ranks);
+
+    // Zoom state — controls Y-axis range
+    var yPadding = 1;
+    var ZOOM_MIN_PAD = 0, ZOOM_MAX_PAD = Math.max(5, Math.floor((dataMaxRank - dataMinRank) * 2));
+
+    // Kit intro annotation lines — only kits from the active guild
+    var KIT_ICON_NAMES = {};
+    kits.forEach(function(k) { KIT_ICON_NAMES[k.icon] = k.key; });
+
+    var firstTs = history[0].ts;
+    var lastTs = history[history.length - 1].ts;
+
+    function buildSvg() {
+        var SVG_W = BASE_SVG_W;
+        var PLOT_W = BASE_PLOT_W;
+        var yMin = Math.max(1, dataMinRank - yPadding);
+        var yMax = dataMaxRank + yPadding;
+
+        function yFor(rank) {
+            if (yMin === yMax) return PT + PLOT_H / 2;
+            return PT + ((rank - yMin) / (yMax - yMin)) * PLOT_H;
+        }
+        function xFor(i) {
+            return history.length === 1 ? PL + PLOT_W / 2 : PL + (i / (history.length - 1)) * PLOT_W;
+        }
+        function xForTs(ts) {
+            if (lastTs === firstTs) return PL + PLOT_W / 2;
+            return PL + ((ts - firstTs) / (lastTs - firstTs)) * PLOT_W;
+        }
+
+        var svg = '';
+
+        // Kit intro annotation lines
+        if (kitIntroDate) {
+            var dateGroups = {};
+            for (var icon in kitIntroDate) {
+                if (!KIT_ICON_NAMES[icon]) continue;
+                var ts2 = kitIntroDate[icon];
+                if (ts2 >= firstTs && ts2 <= lastTs) {
+                    var key = ts2.toString();
+                    if (!dateGroups[key]) dateGroups[key] = { ts: ts2, names: [] };
+                    dateGroups[key].names.push(KIT_ICON_NAMES[icon]);
+                }
+            }
+            for (var gk in dateGroups) {
+                var g = dateGroups[gk];
+                var gx = xForTs(g.ts);
+                svg += '<line x1="' + gx.toFixed(1) + '" y1="' + PT + '" x2="' + gx.toFixed(1) + '" y2="' + (PT + PLOT_H) + '" stroke="rgba(238,205,20,0.18)" stroke-width="1" stroke-dasharray="5,4"/>';
+                var label = '+' + g.names.join(', ');
+                var dateStr = new Date(g.ts).toLocaleDateString('cs-CZ');
+                svg += '<text x="' + gx.toFixed(1) + '" y="' + (PT - 16) + '" text-anchor="middle" font-family="Poppins,sans-serif" font-size="9" font-weight="600" fill="rgba(238,205,20,0.55)">' + _rhEscape(label) + '</text>';
+                svg += '<text x="' + gx.toFixed(1) + '" y="' + (PT - 5) + '" text-anchor="middle" font-family="Poppins,sans-serif" font-size="7.5" fill="rgba(238,205,20,0.35)">' + _rhEscape(dateStr) + '</text>';
+            }
+        }
+
+        // Y-axis labels
+        var range = yMax - yMin;
+        var step = 1;
+        if (range > 40) step = 10;
+        else if (range > 20) step = 5;
+        else if (range > 10) step = 2;
+
+        for (var r = yMin; r <= yMax; r += step) {
+            var yy = yFor(r);
+            svg += '<line x1="' + PL + '" y1="' + yy + '" x2="' + (PL + PLOT_W) + '" y2="' + yy + '" stroke="rgba(255,255,255,0.055)" stroke-width="1"/>';
+            svg += '<text x="' + (PL - 8) + '" y="' + (yy + 4) + '" text-anchor="end" font-family="Poppins,sans-serif" font-size="11" font-weight="700" fill="' + _rhRankColor(r) + '">#' + r + '</text>';
+        }
+
+        // X-axis date labels
+        var maxLabels = Math.max(12, Math.floor(PLOT_W / 70));
+        var labelStep = Math.max(1, Math.ceil(history.length / maxLabels));
+        history.forEach(function(h, i) {
+            if (i % labelStep === 0 || i === history.length - 1) {
+                var x = xFor(i);
+                svg += '<text x="' + x + '" y="' + (SVG_H - 6) + '" text-anchor="middle" font-family="Poppins,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.38)">' + _rhEscape(h.date) + '</text>';
+            }
+        });
+
+        // Connecting path
+        if (history.length > 1) {
+            var d = '';
+            history.forEach(function(h, i) {
+                var x = xFor(i), y = yFor(h.rank);
+                d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+            });
+            svg += '<path d="' + d + '" fill="none" stroke="rgba(238,205,20,0.3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+        }
+
+        // Data points
+        history.forEach(function(h, i) {
+            var x = xFor(i), y = yFor(h.rank);
+            var col = _rhRankColor(h.rank);
+            var isLast = (i === history.length - 1);
+            if (isLast) {
+                svg += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="15" fill="' + col + '" opacity="0.13"/>';
+            }
+            svg += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="9" fill="' + col + '" stroke="' + col + '" stroke-width="2.5"/>';
+            svg += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="4" fill="' + col + '" opacity="' + (isLast ? '1' : '0.65') + '"/>';
+            svg += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="17" fill="transparent" class="rh-hit" data-i="' + i + '" style="cursor:pointer"/>';
+        });
+
+        return { svg: svg, SVG_W: SVG_W };
+    }
+
+    var initResult = buildSvg();
+
+    var svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svgEl.setAttribute('viewBox', '0 0 ' + initResult.SVG_W + ' ' + SVG_H);
+    svgEl.setAttribute('width', initResult.SVG_W + 'px');
+    svgEl.style.display = 'block';
+    svgEl.style.overflow = 'visible';
+    svgEl.style.minWidth = initResult.SVG_W + 'px';
+    svgEl.innerHTML = initResult.svg;
+    container.appendChild(svgEl);
+
+    // Scroll to rightmost (current) position
+    requestAnimationFrame(function() { container.scrollLeft = container.scrollWidth; });
+
+    // Mouse wheel → horizontal scroll
+    container.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        container.scrollLeft += e.deltaY * 2;
+    }, { passive: false });
+
+    // Zoom controls (Y-axis range)
+    var contentEl = container.closest('.rank-history-content');
+    var zoomWrap = contentEl ? contentEl.querySelector('.rh-zoom-controls') : null;
+    if (!zoomWrap && contentEl) {
+        zoomWrap = document.createElement('div');
+        zoomWrap.className = 'rh-zoom-controls';
+        zoomWrap.innerHTML =
+            '<button class="rh-zoom-btn rh-zoom-out" title="Oddálit (zobrazit více pozic)">−</button>' +
+            '<span class="rh-zoom-label">Zoom</span>' +
+            '<button class="rh-zoom-btn rh-zoom-in" title="Přiblížit (méně pozic, větší detail)">+</button>';
+        contentEl.querySelector('.rank-history-header').after(zoomWrap);
+    }
+
+    function redraw() {
+        var result = buildSvg();
+        svgEl.setAttribute('viewBox', '0 0 ' + result.SVG_W + ' ' + SVG_H);
+        svgEl.setAttribute('width', result.SVG_W + 'px');
+        svgEl.style.minWidth = result.SVG_W + 'px';
+        svgEl.innerHTML = result.svg;
+        bindTooltip();
+    }
+
+    if (zoomWrap) {
+        zoomWrap.querySelector('.rh-zoom-in').onclick = function() {
+            if (yPadding > ZOOM_MIN_PAD) { yPadding = Math.max(ZOOM_MIN_PAD, yPadding - 1); redraw(); }
+        };
+        zoomWrap.querySelector('.rh-zoom-out').onclick = function() {
+            if (yPadding < ZOOM_MAX_PAD) { yPadding = Math.min(ZOOM_MAX_PAD, yPadding + 2); redraw(); }
+        };
+    }
+
+    // Tooltip — placed on body with position:fixed to avoid overflow clipping
+    var tip = document.createElement('div');
+    tip.className = 'rank-history-tooltip';
+    tip.style.cssText = 'display:none;position:fixed;';
+    document.body.appendChild(tip);
+
+    var removeTip = function() { if (tip.parentNode) tip.parentNode.removeChild(tip); };
+    var modal = document.getElementById('rank-history-modal');
+    if (modal) {
+        var obs = new MutationObserver(function() {
+            if (modal.style.display === 'none') { removeTip(); obs.disconnect(); }
+        });
+        obs.observe(modal, { attributes: true, attributeFilter: ['style'] });
+    }
+
+    function bindTooltip() {
+        svgEl.querySelectorAll('.rh-hit').forEach(function(circle) {
+            circle.addEventListener('mouseenter', function() {
+                var idx = parseInt(this.getAttribute('data-i'));
+                var h = history[idx];
+                var col = _rhRankColor(h.rank);
+                var isLast = (idx === history.length - 1);
+                tip.innerHTML =
+                    '<div class="rank-history-tooltip-rank" style="color:' + col + '">#' + h.rank + '</div>' +
+                    '<div class="rank-history-tooltip-date">' + _rhEscape(h.date) + '</div>' +
+                    (isLast ? '<div class="rank-history-tooltip-current">Aktuální pozice</div>' : '');
+                tip.style.display = 'block';
+                var circleRect = this.getBoundingClientRect();
+                tip.style.left = (circleRect.left + circleRect.width / 2 - tip.offsetWidth / 2) + 'px';
+                tip.style.top = (circleRect.top - tip.offsetHeight - 10) + 'px';
+            });
+            circle.addEventListener('mouseleave', function() { tip.style.display = 'none'; });
+        });
+    }
+    bindTooltip();
+}
+
+function showRankHistory(playerNick, discordId) {
+    var modal = document.getElementById('rank-history-modal');
+    if (!modal) return;
+
+    modal.querySelector('.rank-history-title').textContent = 'Rank History';
+    modal.querySelector('.rank-history-player').textContent = playerNick;
+    var wrapper = modal.querySelector('.rank-history-timeline-wrapper');
+
+    // Show loading state
+    wrapper.innerHTML = '<div class="rank-history-loading"><div class="rh-spinner"></div><div class="rh-loading-text">Počítám historii...</div></div>';
+    modal.style.display = 'flex';
+
+    // Defer computation so the loading UI renders first
+    requestAnimationFrame(function() {
+        setTimeout(function() {
+            var result = computeRankHistory(discordId);
+            var history = result.history;
+            var kitIntroDate = result.kitIntroDate;
+
+            if (history.length < 2) {
+                wrapper.innerHTML = '<div class="rank-history-no-data">Nedostatek dat pro zobrazení historie umístění.</div>';
+            } else {
+                renderRankHistoryChart(wrapper, history, kitIntroDate);
+            }
+        }, 20);
+    });
+
+    // Close handlers
+    var closeBtn = modal.querySelector('.rank-history-close');
+    if (closeBtn) closeBtn.onclick = function() { modal.style.display = 'none'; };
+    modal.onclick = function(e) { if (e.target === modal) modal.style.display = 'none'; };
+}
+
+// Close rank history on Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var rm = document.getElementById('rank-history-modal');
+        if (rm && rm.style.display === 'flex') rm.style.display = 'none';
+    }
+});
+
 document.addEventListener('DOMContentLoaded', function () {
     // Načti data z Excelu (overall)
     let players = [];
@@ -332,19 +795,34 @@ document.addEventListener('DOMContentLoaded', function () {
         title.className = 'kit-title';
         title.textContent = kitKey === 'overall' ? 'Overall' : kitKey.toUpperCase();
         tabulka.appendChild(title);
+
+        // Retired toggle button (only for kit pages, not overall)
+        if (kitKey !== 'overall') {
+            const toggleWrap = document.createElement('div');
+            toggleWrap.className = 'retired-toggle-wrap';
+            toggleWrap.innerHTML = '<button class="retired-toggle-btn" id="retired-toggle-btn"><span class="retired-toggle-icon">R</span> Zobrazit retired</button>';
+            tabulka.appendChild(toggleWrap);
+        }
+
         // Columns
         const columns = document.createElement('div');
         columns.className = 'kit-columns';
         
+        // Retired tier values
+        const RETIRED_VALUES = new Set(['22', '29', '43', '54']);
+
         // Mapování tier hodnot na tier názvy a barvy
         const tierGroups = [
-            { name: 'Tier 1', color: '#eecd14', icon: '🥇', values: ['60', '54'] }, // HT1, RHT1
-            { name: 'Tier 2', color: '#c0c0c0', icon: '🥈', values: ['48', '43', '32', '29'] }, // LT1, RLT1, HT2, RHT2
-            { name: 'Tier 3', color: '#cd7f32', icon: '🥉', values: ['24', '22', '16', '10'] }, // LT2, RLT2, HT3, LT3
+            { name: 'Tier 1', color: '#eecd14', icon: '🥇', values: ['60', '54', '48', '43'] }, // HT1, RHT1, LT1, RLT1
+            { name: 'Tier 2', color: '#c0c0c0', icon: '🥈', values: ['32', '29', '24', '22'] }, // HT2, RHT2, LT2, RLT2
+            { name: 'Tier 3', color: '#cd7f32', icon: '🥉', values: ['16', '10'] }, // HT3, LT3
             { name: 'Tier 4', color: '#23242a', icon: '', values: ['5', '3'] }, // HT4, LT4
             { name: 'Tier 5', color: '#23242a', icon: '', values: ['2', '1'] } // HT5, LT5
         ];
         
+        // Track retired state
+        let showRetired = false;
+
         // Always render columns in order, even if empty
         for (const tierObj of tierGroups) {
             const col = document.createElement('div');
@@ -359,29 +837,27 @@ document.addEventListener('DOMContentLoaded', function () {
             const list = document.createElement('div');
             list.className = 'kit-tier-list';
             
-            // Najdi hráče podle tier hodnot v daném kitu
-            players.forEach(player => {
-                // Najdi tier pro tento kit
-                const kitTier = player.tiers?.find(t => {
-                    // Mapování kit keys na ikony
-                    const iconMap = {
-                        'cpvp': 'kit_icons/cpvp.png',
-                        'axe': 'kit_icons/axe.png',
-                        'sword': 'kit_icons/sword.png',
-                        'uhc': 'kit_icons/uhc.png',
-                        'npot': 'kit_icons/npot.png',
-                        'pot': 'kit_icons/pot.png',
-                        'smp': 'kit_icons/smp.png',
-                        'diasmp': 'kit_icons/diasmp.png',
-                        'mace': 'kit_icons/mace.png'
-                    };
-                    return t.icon === iconMap[kitKey];
-                });
+            const iconMap = {
+                'cpvp': 'kit_icons/cpvp.png',
+                'axe': 'kit_icons/axe.png',
+                'sword': 'kit_icons/sword.png',
+                'uhc': 'kit_icons/uhc.png',
+                'npot': 'kit_icons/npot.png',
+                'pot': 'kit_icons/pot.png',
+                'smp': 'kit_icons/smp.png',
+                'diasmp': 'kit_icons/diasmp.png',
+                'mace': 'kit_icons/mace.png'
+            };
+            // Render players in value order (HT → RHT → LT → RLT)
+            for (const val of tierObj.values) {
+                const isRetired = RETIRED_VALUES.has(val);
+                if (isRetired && !showRetired) continue;
+                players.forEach(player => {
+                const kitTier = player.tiers?.find(t => t.icon === iconMap[kitKey]);
+                if (!kitTier || String(kitTier.tier) !== val) return;
                 
-                // Pokud hráč má tier v tomto kitu a odpovídá tier skupině
-                if (kitTier && tierObj.values.includes(String(kitTier.tier))) {
                 const div = document.createElement('div');
-                div.className = 'kit-player';
+                div.className = 'kit-player' + (isRetired ? ' kit-player-retired' : '');
                 div.style.cursor = 'pointer';
                 
                 // Vytvoř img element s error handlingem
@@ -402,6 +878,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 
                 div.appendChild(img);
                 div.appendChild(span);
+                
+                // Add retired badge
+                if (isRetired) {
+                    const badge = document.createElement('span');
+                    badge.className = 'retired-badge';
+                    badge.textContent = 'R';
+                    div.appendChild(badge);
+                }
                 
                 // Click handler pro zobrazení modalu
                 div.addEventListener('click', function() {
@@ -479,12 +963,156 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 
                 list.appendChild(div);
-                }
-            });
+                });
+            }
             col.appendChild(list);
             columns.appendChild(col);
         }
         tabulka.appendChild(columns);
+        
+        // Retired toggle handler
+        if (kitKey !== 'overall') {
+            const toggleBtn = document.getElementById('retired-toggle-btn');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function() {
+                    showRetired = !showRetired;
+                    toggleBtn.classList.toggle('active', showRetired);
+                    toggleBtn.innerHTML = showRetired
+                        ? '<span class="retired-toggle-icon">R</span> Skrýt retired'
+                        : '<span class="retired-toggle-icon">R</span> Zobrazit retired';
+                    // Re-render columns
+                    tabulka.querySelector('.kit-columns')?.remove();
+                    const newColumns = document.createElement('div');
+                    newColumns.className = 'kit-columns';
+                    
+                    for (const tg of tierGroups) {
+                        const col2 = document.createElement('div');
+                        col2.className = 'kit-tier-col';
+                        col2.setAttribute('data-tier', tg.name);
+                        const hdr = document.createElement('div');
+                        hdr.className = 'kit-tier-header';
+                        hdr.style.background = tg.color;
+                        hdr.style.color = '#fff';
+                        hdr.innerHTML = tg.icon ? `<span style="font-size:1.3em;vertical-align:middle;">${tg.icon}</span> ${tg.name}` : tg.name;
+                        col2.appendChild(hdr);
+                        const lst = document.createElement('div');
+                        lst.className = 'kit-tier-list';
+                        
+                        const iconMap2 = {
+                            'cpvp': 'kit_icons/cpvp.png',
+                            'axe': 'kit_icons/axe.png',
+                            'sword': 'kit_icons/sword.png',
+                            'uhc': 'kit_icons/uhc.png',
+                            'npot': 'kit_icons/npot.png',
+                            'pot': 'kit_icons/pot.png',
+                            'smp': 'kit_icons/smp.png',
+                            'diasmp': 'kit_icons/diasmp.png',
+                            'mace': 'kit_icons/mace.png'
+                        };
+                        for (const val of tg.values) {
+                            const isRetVal = RETIRED_VALUES.has(val);
+                            if (isRetVal && !showRetired) continue;
+                            players.forEach(player => {
+                            const kitTier = player.tiers?.find(t => t.icon === iconMap2[kitKey]);
+                            if (!kitTier || String(kitTier.tier) !== val) return;
+                            const isRet = isRetVal;
+                                
+                                const div = document.createElement('div');
+                                div.className = 'kit-player' + (isRet ? ' kit-player-retired' : '');
+                                div.style.cursor = 'pointer';
+                                
+                                const img = document.createElement('img');
+                                const escapedNick = encodeURIComponent(player.nick);
+                                img.src = `https://mc-heads.net/avatar/${escapedNick}/32`;
+                                img.alt = 'skin';
+                                img.style.cssText = 'width:32px;height:32px;border-radius:8px;margin-right:8px;vertical-align:middle;';
+                                img.onerror = function() {
+                                    this.src = `https://crafatar.com/avatars/${escapedNick}?size=32&default=MHF_Steve&overlay`;
+                                };
+                                
+                                const span = document.createElement('span');
+                                span.textContent = player.nick;
+                                
+                                div.appendChild(img);
+                                div.appendChild(span);
+                                
+                                if (isRet) {
+                                    const badge = document.createElement('span');
+                                    badge.className = 'retired-badge';
+                                    badge.textContent = 'R';
+                                    div.appendChild(badge);
+                                }
+                                
+                                div.addEventListener('click', function() {
+                                    const fullPlayer = allPlayers.find(p => p.nick === player.nick);
+                                    if (!fullPlayer) return;
+                                    const sortedPlayers = [...allPlayers].sort((a, b) => {
+                                        if (b.score !== a.score) return b.score - a.score;
+                                        return (a.nick || '').localeCompare(b.nick || '');
+                                    });
+                                    let position = '?';
+                                    let lastScore = -1;
+                                    let lastRank = 0;
+                                    for (let i = 0; i < sortedPlayers.length; i++) {
+                                        const p = sortedPlayers[i];
+                                        let currentRank;
+                                        if (p.score !== lastScore) { currentRank = i + 1; }
+                                        else { currentRank = lastRank; }
+                                        if (p.nick === fullPlayer.nick) { position = currentRank + '.'; break; }
+                                        lastScore = p.score;
+                                        lastRank = currentRank;
+                                    }
+                                    const sortedTiers = (fullPlayer.tiers || [])
+                                        .filter(t => t.tier && t.tier !== "-")
+                                        .sort((a, b) => getTierOrder(a.tier) - getTierOrder(b.tier));
+                                    const kitsHtml = sortedTiers.map(t => {
+                                        const info = tierInfo(String(t.tier));
+                                        const origText = getOriginalTierText(String(t.tier));
+                                        let style = "";
+                                        let circleColor = "";
+                                        if (origText.startsWith("R")) {
+                                            style = "background:#23242a;color:" + info.barvaTextu + ";";
+                                            circleColor = "#23242a";
+                                        } else {
+                                            style = "background:" + info.barvaPozadi + ";color:#23242a;";
+                                            circleColor = info.barvaPozadi;
+                                        }
+                                        const ptsDisplay = t.peakTierText ? PEAK_TIER_SCORE[t.peakTierText] : t.tier;
+                                        const peakExtra = t.peakTierText ? '<br><span style="font-size:0.85em;opacity:0.7;">Peak: ' + t.peakTierText + '</span>' : '';
+                                        return '<span class="kit-badge tooltip" data-kit-icon="' + t.icon + '" style="--tier-color:' + (origText.startsWith('R') ? info.barvaTextu : info.barvaPozadi) + ';">' +
+                                            '<span class="kit-icon-circle" style="border-color:' + circleColor + ';">' +
+                                            '<img src="' + t.icon + '" alt="" class="kit-icon" loading="lazy">' +
+                                            '</span>' +
+                                            '<span class="kit-tier-text" style="' + style + '">' +
+                                            info.novyText +
+                                            '</span>' +
+                                            '<span class="tooltiptext">' +
+                                            '<strong>' + origText + '</strong><br>' +
+                                            ptsDisplay + ' pts' + peakExtra +
+                                            '</span>' +
+                                            '</span>';
+                                    }).join('');
+                                    showPlayerModal({
+                                        name: fullPlayer.nick,
+                                        nick: fullPlayer.nick,
+                                        discordId: fullPlayer.discordId || '',
+                                        position: position,
+                                        score: fullPlayer.score,
+                                        skin: 'https://mc-heads.net/avatar/' + escapedNick + '/64',
+                                        kitsHtml: kitsHtml
+                                    });
+                                });
+                                
+                                lst.appendChild(div);
+                            });
+                        }
+                        col2.appendChild(lst);
+                        newColumns.appendChild(col2);
+                    }
+                    tabulka.appendChild(newColumns);
+                });
+            }
+        }
     }
 
     // Navigation logic
@@ -706,12 +1334,26 @@ document.addEventListener('DOMContentLoaded', function () {
         const bioEl = modal.querySelector('#player-modal-bio');
         const content = modal.querySelector('.player-modal-content');
         const favkitEl = modal.querySelector('#player-modal-favkit');
+        const decoWrap = modal.querySelector('#avatar-deco-wrap');
+        const decoOverlay = modal.querySelector('#avatar-deco-overlay');
+
+        // Reset decoration, name effect, theme
+        if (decoWrap) decoWrap.removeAttribute('data-deco');
+        if (decoOverlay) { decoOverlay.style.display = 'none'; decoOverlay.src = ''; }
+        if (name) name.className = 'player-modal-name';
+        if (content) { content.className = 'player-modal-content'; content.removeAttribute('data-theme'); }
+
+        // Reset customization defaults
+        if (banner) banner.style.display = 'none';
+        if (bioEl) bioEl.style.display = 'none';
+        if (name) name.style.color = '';
+        if (content) content.style.borderColor = '';
+        if (favkitEl) favkitEl.style.display = 'none';
         
         if (skin) skin.src = data.skin;
         if (name) name.textContent = data.name;
         if (rank) {
             rank.textContent = data.position;
-            // Styling podle pozice
             rank.className = 'player-modal-rank';
             const pos = parseInt(data.position);
             if (pos === 1) rank.classList.add('rank-1');
@@ -766,6 +1408,26 @@ document.addEventListener('DOMContentLoaded', function () {
                     favkitEl.innerHTML = '<span class="favkit-label">Oblíbený kit:</span> <span class="favkit-value">' + cs.favoriteKit + '</span>';
                     favkitEl.style.display = '';
                 } else if (favkitEl) { favkitEl.style.display = 'none'; }
+                // Avatar decoration
+                if (decoWrap && cs.decoration) {
+                    decoWrap.setAttribute('data-deco', cs.decoration);
+                    if (decoOverlay) {
+                        decoOverlay.src = 'decorations/' + cs.decoration + '.png';
+                        decoOverlay.style.display = '';
+                        decoOverlay.onerror = function() { decoOverlay.style.display = 'none'; };
+                    }
+                }
+                // Name effect
+                if (name && cs.nameEffect) {
+                    name.classList.add('name-effect-' + cs.nameEffect);
+                    if (cs.nameEffect === 'gradient' || cs.nameEffect === 'rainbow') {
+                        name.style.color = '';
+                    }
+                }
+                // Profile theme
+                if (content && cs.theme) {
+                    content.setAttribute('data-theme', cs.theme);
+                }
             } else {
                 if (banner) banner.style.display = 'none';
                 if (bioEl) bioEl.style.display = 'none';
@@ -784,10 +1446,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 const db = typeof firebase !== 'undefined' && firebase.firestore ? firebase.firestore() : null;
                 if (db) {
                     db.collection('cardSettings').doc(playerNickForCard).get().then(doc => {
-                        if (doc.exists) applyCardSettings(doc.data());
-                    }).catch(() => {});
+                        if (doc.exists) {
+                            applyCardSettings(doc.data());
+                        }
+                    }).catch(e => console.warn('[CardSettings] Firestore load failed for "' + playerNickForCard + '":', e));
                 }
-            } catch(e) {}
+            } catch(e) { console.warn('[CardSettings] Error:', e); }
         }
 
         // Achievements
@@ -817,6 +1481,22 @@ document.addEventListener('DOMContentLoaded', function () {
                     window.showTierJourney(data.nick, badge.dataset.kitIcon, badge.dataset.kitTier || '', data.discordId || '');
                 });
             });
+        }
+
+        // Wire Rank History button
+        var rankBtn = document.getElementById('rank-history-btn');
+        if (rankBtn) {
+            var newBtn = rankBtn.cloneNode(true);
+            rankBtn.parentNode.replaceChild(newBtn, rankBtn);
+            if (data.discordId) {
+                newBtn.style.display = '';
+                newBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    showRankHistory(data.nick || data.name, data.discordId);
+                });
+            } else {
+                newBtn.style.display = 'none';
+            }
         }
         
         modal.style.display = 'flex';

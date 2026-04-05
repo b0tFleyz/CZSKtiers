@@ -287,6 +287,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     let discordIdToNick = {}; // Discord ID → Nick, built from spreadsheet data
     let tierHistory = {}; // keyed by discordId → kitIcon → [{tier, date, note, kit, oldTier}]
 
+    // Time Machine state
+    let _tmActive = false;
+    let _tmBlacklistedIds = new Set();
+    let _originalOverallData = null;
+
     // Load card settings from localStorage for the logged-in user
     function getMyCardSettings() {
         try {
@@ -650,12 +655,14 @@ document.addEventListener('DOMContentLoaded', async function () {
             card.style.setProperty('--rank-color-rgb', rankColorRGB);
             card.style.setProperty('--card-i', String(index));
 
-            // Position change arrow
+            // Position change arrow (hidden during time travel)
             let posHtml = '';
-            if (posChange > 0) {
-                posHtml = `<span class="pos-change pos-up" title="+${posChange}"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 2L10 8H2Z" fill="currentColor"/></svg>${posChange}</span>`;
-            } else if (posChange < 0) {
-                posHtml = `<span class="pos-change pos-down" title="${posChange}"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 10L10 4H2Z" fill="currentColor"/></svg>${Math.abs(posChange)}</span>`;
+            if (!_tmActive) {
+                if (posChange > 0) {
+                    posHtml = `<span class="pos-change pos-up" title="+${posChange}"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 2L10 8H2Z" fill="currentColor"/></svg>${posChange}</span>`;
+                } else if (posChange < 0) {
+                    posHtml = `<span class="pos-change pos-down" title="${posChange}"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 10L10 4H2Z" fill="currentColor"/></svg>${Math.abs(posChange)}</span>`;
+                }
             }
 
             // Score title
@@ -677,6 +684,26 @@ document.addEventListener('DOMContentLoaded', async function () {
                     <div class="kits-row">${kitsHtml}</div>
                 </div>
             `;
+
+            // Time Machine: blacklisted player styling
+            if (_tmActive && _tmBlacklistedIds.has(player.discordId)) {
+                card.classList.add('tm-blacklisted');
+                const nameEl = card.querySelector('.player-name');
+                if (nameEl) {
+                    nameEl.textContent = '???';
+                    nameEl.insertAdjacentHTML('afterend', '<span class="tm-blacklisted-tag">blacklistnutý</span>');
+                }
+                // Replace skin with placeholder
+                const skinImg = card.querySelector('.skin');
+                if (skinImg) {
+                    skinImg.src = 'https://mc-heads.net/avatar/MHF_Question/64';
+                    skinImg.alt = '???';
+                }
+                // Blacklisted players are not clickable
+                card.style.pointerEvents = 'none';
+                card.style.cursor = 'default';
+                return card;
+            }
 
             // Score click — show score history graph
             const scoreEl = card.querySelector('.score-clickable');
@@ -946,6 +973,11 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     function resolveTierValue(tier) {
         tier = String(tier).trim();
+        // Handle "LT3 + Evaluation", "LT3 + Eval", "Evaluation" etc.
+        const upper = tier.toUpperCase();
+        if (upper.includes('EVAL')) {
+            return '10'; // LT3
+        }
         const validNums = ['1','2','3','5','10','16','24','32','48','60','22','29','43','54'];
         if (validNums.includes(tier)) return tier;
         const textMap = {
@@ -953,7 +985,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             'LT3':'10','HT4':'5','LT4':'3','HT5':'2','LT5':'1',
             'RHT1':'54','RLT1':'43','RHT2':'29','RLT2':'22'
         };
-        return textMap[tier.toUpperCase()] || null;
+        return textMap[upper] || null;
     }
 
     function escapeXml(str) {
@@ -1316,6 +1348,12 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Remove loading state — reveal content
         content.classList.remove('modal-loading');
+
+        // Show/hide Rank History button
+        const rhBtn = document.getElementById('rank-history-btn');
+        if (rhBtn) {
+            rhBtn.style.display = discordId ? '' : 'none';
+        }
     }
 
     function computeAchievements({ name, position, score, tiers, discordId, hallOfFame, tester, allTestedIcons }) {
@@ -1329,7 +1367,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             achievements.push({ label: 'Exekutor', desc: 'První tester', color: '#5adc26' });
         }
         if (nick === 'EBAN92') {
-            achievements.push({ label: 'Eban', desc: 'Stvořitel tierlistu', color: '#ff0000' });
+            achievements.push({ label: 'EBAN', desc: 'Stvořitel tierlistu', color: '#ff0000' });
         }
         if (nick === 'Fleyz') {
             achievements.push({ label: 'Fleyz', desc: 'Spolumajitel, vytvořil bota a stránky', color: '#eb9525' });
@@ -1533,9 +1571,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                 return;
             }
 
-            // Filtruj hráče
+            // Filtruj hráče (skip blacklisted during time travel)
             const matches = allPlayers.filter(player => 
-                player.nick && player.nick.toLowerCase().includes(query)
+                player.nick && player.nick.toLowerCase().includes(query) &&
+                !(_tmActive && _tmBlacklistedIds.has(player.discordId))
             ).slice(0, 8); // Max 8 návrhů
 
             if (matches.length === 0) {
@@ -1874,6 +1913,489 @@ document.addEventListener('DOMContentLoaded', async function () {
         });
     })();
 
+    // ---- Rank History ----
+    function _rhEscape(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function _rhRankColor(rank) {
+        if (rank === 1) return '#FFCF4A';
+        if (rank <= 3) return '#D5B355';
+        if (rank <= 10) return '#A4B3C7';
+        if (rank <= 20) return '#8F5931';
+        return '#655B79';
+    }
+
+    function computeRankHistory(targetDiscordId) {
+        if (!targetDiscordId) return [];
+
+        // Guild-aware: only consider kits from the active guild
+        const validIcons = new Set(kits.map(k => k.icon));
+
+        // Gather ALL discordIds (from overallData + tierHistory)
+        const sourceData = _originalOverallData || overallData;
+        const currentDiscordIds = new Set(sourceData.map(p => p.discordId).filter(Boolean));
+        const allDiscordIds = new Set();
+        for (const [did, kitsObj] of Object.entries(tierHistory)) {
+            for (const icon of Object.keys(kitsObj)) {
+                if (validIcons.has(icon)) { allDiscordIds.add(did); break; }
+            }
+        }
+        currentDiscordIds.forEach(id => allDiscordIds.add(id));
+
+        // Pre-sort events per player/kit for forward reconstruction
+        const sortedEvents = {}; // discordId -> kitIcon -> sorted events array
+        for (const did of allDiscordIds) {
+            sortedEvents[did] = {};
+            const ph = tierHistory[did] || {};
+            for (const kitIcon of Object.keys(ph)) {
+                if (!validIcons.has(kitIcon)) continue;
+                sortedEvents[did][kitIcon] = ph[kitIcon]
+                    .map(e => ({ ...e, _ts: parseCzechDate(e.date) }))
+                    .filter(e => e._ts)
+                    .sort((a, b) => a._ts - b._ts);
+            }
+        }
+
+        // Pre-compute peak tier earned timestamps for every player/kit
+        // Use the SAME function as the overall page (getPeakTierTextFromHistory)
+        const playerPeakScores = {}; // discordId -> { kitIcon -> score }
+        for (const did of allDiscordIds) {
+            playerPeakScores[did] = {};
+            for (const kit of kits) {
+                if (!validIcons.has(kit.icon)) continue;
+                const peakText = getPeakTierTextFromHistory(did, kit.icon);
+                if (peakText && PEAK_TIER_SCORE[peakText]) {
+                    playerPeakScores[did][kit.icon] = PEAK_TIER_SCORE[peakText];
+                }
+            }
+        }
+
+        // Compute kit introduction dates from tier history (earliest event per kit)
+        const kitIntroDate = {};
+        for (const did in tierHistory) {
+            for (const kitIcon in tierHistory[did]) {
+                if (!validIcons.has(kitIcon)) continue;
+                tierHistory[did][kitIcon].forEach(entry => {
+                    const ts = parseCzechDate(entry.date);
+                    if (ts && (!kitIntroDate[kitIcon] || ts < kitIntroDate[kitIcon])) {
+                        kitIntroDate[kitIcon] = ts;
+                    }
+                });
+            }
+        }
+
+        // Peak tier system was introduced on 5.3.2026
+        const PEAK_SYSTEM_TS = new Date(2026, 2, 5).getTime();
+
+        // Build current kit vals from spreadsheet (ground truth for "now")
+        const currentKitVals = {}; // discordId -> { kitIcon -> tierValue }
+        sourceData.forEach(p => {
+            if (!p.discordId) return;
+            currentKitVals[p.discordId] = {};
+            (p.tiers || []).forEach(t => {
+                if (!validIcons.has(t.icon)) return;
+                currentKitVals[p.discordId][t.icon] = parseInt(t.tier) || 0;
+            });
+        });
+        // For players only in tierHistory (removed/blacklisted), reconstruct from latest events
+        for (const did of allDiscordIds) {
+            if (!currentKitVals[did]) {
+                currentKitVals[did] = {};
+                for (const kitIcon in (sortedEvents[did] || {})) {
+                    const evts = sortedEvents[did][kitIcon];
+                    if (evts.length) {
+                        currentKitVals[did][kitIcon] = parseInt(resolveTierValue(evts[evts.length - 1].tier)) || 0;
+                    }
+                }
+            }
+        }
+
+        const NOW = Date.now();
+
+        // Pre-build current scores from spreadsheet (ground truth for "now")
+        const currentScores = {};
+        sourceData.forEach(p => { if (p.discordId) currentScores[p.discordId] = p.score; });
+
+        // Forward reconstruction: get a player's tier value for a kit at a given timestamp
+        function getTierAtTime(discordId, kitIcon, atTs) {
+            // For current time, use spreadsheet data (ground truth)
+            if (atTs >= NOW && currentKitVals[discordId] && currentKitVals[discordId][kitIcon] !== undefined) {
+                return currentKitVals[discordId][kitIcon];
+            }
+            const events = sortedEvents[discordId]?.[kitIcon] || [];
+            let tierVal = 0;
+            for (let i = events.length - 1; i >= 0; i--) {
+                if (events[i]._ts <= atTs) {
+                    tierVal = parseInt(resolveTierValue(events[i].tier)) || 0;
+                    break;
+                }
+            }
+            return tierVal;
+        }
+
+        // Compute a player's score at a given timestamp using forward reconstruction
+        function getPlayerScoreAtTime(discordId, atTs) {
+            // For current time, use actual score from the overall spreadsheet (ground truth)
+            if (atTs >= NOW && currentScores[discordId] !== undefined) {
+                return currentScores[discordId];
+            }
+            let s = 0;
+            const pe = playerPeakScores[discordId] || {};
+            for (const kit of kits) {
+                if (!validIcons.has(kit.icon)) continue;
+                if (kitIntroDate[kit.icon] && atTs < kitIntroDate[kit.icon]) continue;
+                const tierVal = getTierAtTime(discordId, kit.icon, atTs);
+                // Peak bonuses apply from PEAK_SYSTEM_TS onward (when peak system was introduced)
+                let peakScore = 0;
+                if (atTs >= PEAK_SYSTEM_TS && pe[kit.icon]) {
+                    peakScore = pe[kit.icon];
+                }
+                s += Math.max(tierVal, peakScore);
+            }
+            return s;
+        }
+
+        // Get the target player's rank at a given timestamp
+        function getRankAtTime(atTs) {
+            const targetScore = getPlayerScoreAtTime(targetDiscordId, atTs);
+            if (targetScore <= 0) return null;
+            let rank = 1;
+            // For current time, rank only against spreadsheet players (matching overall page)
+            if (atTs >= NOW) {
+                for (let i = 0; i < sourceData.length; i++) {
+                    const p = sourceData[i];
+                    if (p.discordId === targetDiscordId) continue;
+                    if ((p.score || 0) > targetScore) rank++;
+                }
+                return rank;
+            }
+            for (const did of allDiscordIds) {
+                if (did === targetDiscordId) continue;
+                if (getPlayerScoreAtTime(did, atTs) > targetScore) rank++;
+            }
+            return rank;
+        }
+
+        // Collect ALL unique event timestamps
+        const allTimestamps = new Set();
+        for (const dId in tierHistory) {
+            for (const kitIcon in tierHistory[dId]) {
+                if (!validIcons.has(kitIcon)) continue;
+                tierHistory[dId][kitIcon].forEach(entry => {
+                    const ts = parseCzechDate(entry.date);
+                    if (ts) allTimestamps.add(ts);
+                });
+            }
+        }
+        allTimestamps.add(Date.now()); // current
+        allTimestamps.add(PEAK_SYSTEM_TS); // peak tier system introduction
+
+        // Sort timestamps chronologically
+        const sortedTimestamps = [...allTimestamps].sort((a, b) => a - b);
+
+        // Build rank history at each event timestamp
+        const rawHistory = [];
+        for (const ts of sortedTimestamps) {
+            const rank = getRankAtTime(ts);
+            if (rank !== null) {
+                const d = new Date(ts);
+                rawHistory.push({ ts, date: d.toLocaleDateString('cs-CZ'), rank });
+            }
+        }
+
+        // Consolidate by date
+        const byDate = {};
+        const dateOrder = [];
+        rawHistory.forEach(h => {
+            if (!byDate[h.date]) dateOrder.push(h.date);
+            byDate[h.date] = h;
+        });
+        let history = dateOrder.map(d => byDate[d]);
+
+        // Remove consecutive duplicates
+        if (history.length > 2) {
+            const filtered = [history[0]];
+            for (let j = 1; j < history.length - 1; j++) {
+                if (history[j].rank !== history[j-1].rank || history[j].rank !== history[j+1].rank) {
+                    filtered.push(history[j]);
+                }
+            }
+            filtered.push(history[history.length - 1]);
+            history = filtered;
+        }
+
+        return { history, kitIntroDate, peakSystemTs: PEAK_SYSTEM_TS };
+    }
+
+    function renderRankHistoryChart(container, history, kitIntroDate, peakSystemTs) {
+        container.innerHTML = '';
+
+        const PL = 56, PR = 24, PT = 50, PB = 44;
+        const SVG_H = 360;
+        const PLOT_H = SVG_H - PT - PB;
+
+        const ranks = history.map(h => h.rank);
+        const dataMinRank = Math.min(...ranks);
+        const dataMaxRank = Math.max(...ranks);
+        const yMin = Math.max(1, dataMinRank - 1);
+        const yMax = dataMaxRank + 1;
+
+        // Zoom state — controls horizontal spacing (px per data point)
+        let pxPerPoint = 80;
+        const ZOOM_MIN_PX = 30;
+        const ZOOM_MAX_PX = 250;
+
+        // Kit intro annotation lines — only kits from the active guild
+        const KIT_ICON_NAMES = {};
+        kits.forEach(k => { KIT_ICON_NAMES[k.icon] = k.key; });
+
+        const firstTs = history[0].ts;
+        const lastTs = history[history.length - 1].ts;
+
+        function buildSvg() {
+            const SVG_W = Math.max(700, history.length * pxPerPoint) + PL + PR;
+            const PLOT_W = SVG_W - PL - PR;
+
+            function yFor(rank) {
+                if (yMin === yMax) return PT + PLOT_H / 2;
+                return PT + ((rank - yMin) / (yMax - yMin)) * PLOT_H;
+            }
+            function xFor(i) {
+                return history.length === 1 ? PL + PLOT_W / 2 : PL + (i / (history.length - 1)) * PLOT_W;
+            }
+            function xForTs(ts) {
+                if (lastTs === firstTs) return PL + PLOT_W / 2;
+                return PL + ((ts - firstTs) / (lastTs - firstTs)) * PLOT_W;
+            }
+
+            let svg = '';
+
+            // Kit intro annotation lines
+            if (kitIntroDate) {
+                const dateGroups = {};
+                for (const icon in kitIntroDate) {
+                    if (!KIT_ICON_NAMES[icon]) continue;
+                    const ts = kitIntroDate[icon];
+                    if (ts >= firstTs && ts <= lastTs) {
+                        const key = ts.toString();
+                        if (!dateGroups[key]) dateGroups[key] = { ts, names: [] };
+                        dateGroups[key].names.push(KIT_ICON_NAMES[icon]);
+                    }
+                }
+                Object.values(dateGroups).forEach(g => {
+                    const x = xForTs(g.ts);
+                    svg += `<line x1="${x.toFixed(1)}" y1="${PT}" x2="${x.toFixed(1)}" y2="${PT + PLOT_H}" stroke="rgba(238,205,20,0.18)" stroke-width="1" stroke-dasharray="5,4"/>`;
+                    const label = '+' + g.names.join(', ');
+                    const dateStr = new Date(g.ts).toLocaleDateString('cs-CZ');
+                    svg += `<text x="${x.toFixed(1)}" y="${PT - 16}" text-anchor="middle" font-family="Poppins,sans-serif" font-size="9" font-weight="600" fill="rgba(238,205,20,0.55)">${_rhEscape(label)}</text>`;
+                    svg += `<text x="${x.toFixed(1)}" y="${PT - 5}" text-anchor="middle" font-family="Poppins,sans-serif" font-size="7.5" fill="rgba(238,205,20,0.35)">${_rhEscape(dateStr)}</text>`;
+                });
+            }
+
+            // Peak system annotation line
+            if (peakSystemTs && peakSystemTs >= firstTs && peakSystemTs <= lastTs) {
+                const px = xForTs(peakSystemTs);
+                svg += `<line x1="${px.toFixed(1)}" y1="${PT}" x2="${px.toFixed(1)}" y2="${PT + PLOT_H}" stroke="rgba(238,205,20,0.18)" stroke-width="1" stroke-dasharray="5,4"/>`;
+                const peakDateStr = new Date(peakSystemTs).toLocaleDateString('cs-CZ');
+                svg += `<text x="${px.toFixed(1)}" y="${PT - 16}" text-anchor="middle" font-family="Poppins,sans-serif" font-size="9" font-weight="600" fill="rgba(238,205,20,0.55)">+Peak Tiers</text>`;
+                svg += `<text x="${px.toFixed(1)}" y="${PT - 5}" text-anchor="middle" font-family="Poppins,sans-serif" font-size="7.5" fill="rgba(238,205,20,0.35)">${_rhEscape(peakDateStr)}</text>`;
+            }
+
+            // Y-axis labels
+            const range = yMax - yMin;
+            let step = 1;
+            if (range > 40) step = 10;
+            else if (range > 20) step = 5;
+            else if (range > 10) step = 2;
+
+            for (let r = yMin; r <= yMax; r += step) {
+                const yy = yFor(r);
+                svg += `<line x1="${PL}" y1="${yy}" x2="${PL + PLOT_W}" y2="${yy}" stroke="rgba(255,255,255,0.055)" stroke-width="1"/>`;
+                svg += `<text x="${PL - 8}" y="${yy + 4}" text-anchor="end" font-family="Poppins,sans-serif" font-size="11" font-weight="700" fill="${_rhRankColor(r)}">#${r}</text>`;
+            }
+
+            // X-axis date labels
+            const maxLabels = Math.max(12, Math.floor(PLOT_W / 70));
+            const labelStep = Math.max(1, Math.ceil(history.length / maxLabels));
+            history.forEach((h, i) => {
+                if (i % labelStep === 0 || i === history.length - 1) {
+                    const x = xFor(i);
+                    svg += `<text x="${x}" y="${SVG_H - 6}" text-anchor="middle" font-family="Poppins,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.38)">${_rhEscape(h.date)}</text>`;
+                }
+            });
+
+            // Connecting path
+            if (history.length > 1) {
+                let d = '';
+                history.forEach((h, i) => {
+                    const x = xFor(i), y = yFor(h.rank);
+                    d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+                });
+                svg += `<path d="${d}" fill="none" stroke="rgba(238,205,20,0.3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+            }
+
+            // Data points
+            history.forEach((h, i) => {
+                const x = xFor(i), y = yFor(h.rank);
+                const col = _rhRankColor(h.rank);
+                const isLast = (i === history.length - 1);
+                if (isLast) {
+                    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="15" fill="${col}" opacity="0.13"/>`;
+                }
+                svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9" fill="${col}" stroke="${col}" stroke-width="2.5"/>`;
+                svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${col}" opacity="${isLast ? '1' : '0.65'}"/>`;
+                svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="17" fill="transparent" class="rh-hit" data-i="${i}" style="cursor:pointer"/>`;
+            });
+
+            return { svg, SVG_W };
+        }
+
+        const { svg: initSvg, SVG_W: initW } = buildSvg();
+
+        const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svgEl.setAttribute('viewBox', `0 0 ${initW} ${SVG_H}`);
+        svgEl.setAttribute('width', initW + 'px');
+        svgEl.style.display = 'block';
+        svgEl.style.overflow = 'visible';
+        svgEl.style.minWidth = initW + 'px';
+        svgEl.innerHTML = initSvg;
+        container.appendChild(svgEl);
+
+        // Scroll to rightmost (current) position
+        requestAnimationFrame(() => { container.scrollLeft = container.scrollWidth; });
+
+        // Mouse wheel → horizontal scroll
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            container.scrollLeft += e.deltaY * 2;
+        }, { passive: false });
+
+        // Zoom controls (horizontal width) — always recreate to bind fresh closures
+        const contentEl = container.closest('.rank-history-content');
+        if (contentEl) {
+            const oldZoom = contentEl.querySelector('.rh-zoom-controls');
+            if (oldZoom) oldZoom.remove();
+        }
+        let zoomWrap = null;
+        if (contentEl) {
+            zoomWrap = document.createElement('div');
+            zoomWrap.className = 'rh-zoom-controls';
+            zoomWrap.innerHTML =
+                '<button class="rh-zoom-btn rh-zoom-out" title="Oddálit (menší rozestupy)">−</button>' +
+                '<span class="rh-zoom-label">Zoom</span>' +
+                '<button class="rh-zoom-btn rh-zoom-in" title="Přiblížit (větší rozestupy)">+</button>';
+            contentEl.querySelector('.rank-history-header').after(zoomWrap);
+        }
+
+        function redraw() {
+            const scrollRatio = container.scrollWidth > 0 ? container.scrollLeft / container.scrollWidth : 1;
+            const { svg, SVG_W } = buildSvg();
+            svgEl.setAttribute('viewBox', `0 0 ${SVG_W} ${SVG_H}`);
+            svgEl.setAttribute('width', SVG_W + 'px');
+            svgEl.style.minWidth = SVG_W + 'px';
+            svgEl.innerHTML = svg;
+            bindTooltip();
+            // Preserve scroll position proportionally
+            requestAnimationFrame(() => { container.scrollLeft = scrollRatio * container.scrollWidth; });
+        }
+
+        if (zoomWrap) {
+            zoomWrap.querySelector('.rh-zoom-in').onclick = () => {
+                if (pxPerPoint < ZOOM_MAX_PX) { pxPerPoint = Math.min(ZOOM_MAX_PX, pxPerPoint + 20); redraw(); }
+            };
+            zoomWrap.querySelector('.rh-zoom-out').onclick = () => {
+                if (pxPerPoint > ZOOM_MIN_PX) { pxPerPoint = Math.max(ZOOM_MIN_PX, pxPerPoint - 20); redraw(); }
+            };
+        }
+
+        // Tooltip — placed on body with position:fixed to avoid overflow clipping
+        const tip = document.createElement('div');
+        tip.className = 'rank-history-tooltip';
+        tip.style.cssText = 'display:none;position:fixed;';
+        document.body.appendChild(tip);
+
+        const removeTip = () => { if (tip.parentNode) tip.parentNode.removeChild(tip); };
+        const modal = document.getElementById('rank-history-modal');
+        if (modal) {
+            const obs = new MutationObserver(() => {
+                if (modal.style.display === 'none') { removeTip(); obs.disconnect(); }
+            });
+            obs.observe(modal, { attributes: true, attributeFilter: ['style'] });
+        }
+
+        function bindTooltip() {
+            svgEl.querySelectorAll('.rh-hit').forEach(circle => {
+                circle.addEventListener('mouseenter', function() {
+                    const idx = parseInt(this.getAttribute('data-i'));
+                    const h = history[idx];
+                    const col = _rhRankColor(h.rank);
+                    const isLast = (idx === history.length - 1);
+                    tip.innerHTML =
+                        `<div class="rank-history-tooltip-rank" style="color:${col}">#${h.rank}</div>` +
+                        `<div class="rank-history-tooltip-date">${_rhEscape(h.date)}</div>` +
+                        (isLast ? '<div class="rank-history-tooltip-current">Aktuální pozice</div>' : '');
+                    tip.style.display = 'block';
+                    const circleRect = this.getBoundingClientRect();
+                    tip.style.left = (circleRect.left + circleRect.width / 2 - tip.offsetWidth / 2) + 'px';
+                    tip.style.top = (circleRect.top - tip.offsetHeight - 10) + 'px';
+                });
+                circle.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+            });
+        }
+        bindTooltip();
+    }
+
+    function showRankHistory(playerNick, discordId) {
+        const modal = document.getElementById('rank-history-modal');
+        if (!modal) return;
+
+        modal.querySelector('.rank-history-title').textContent = 'Rank History';
+        modal.querySelector('.rank-history-player').textContent = playerNick;
+        const wrapper = modal.querySelector('.rank-history-timeline-wrapper');
+
+        // Show loading state
+        wrapper.innerHTML = '<div class="rank-history-loading"><div class="rh-spinner"></div><div class="rh-loading-text">Počítám historii...</div></div>';
+        modal.style.display = 'flex';
+
+        // Defer computation so the loading UI renders first
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                const result = computeRankHistory(discordId);
+                const history = result.history;
+                const kitIntroDate = result.kitIntroDate;
+                const peakSystemTs = result.peakSystemTs;
+
+                if (history.length < 2) {
+                    wrapper.innerHTML = '<div class="rank-history-no-data">Nedostatek dat pro zobrazení historie umístění.</div>';
+                } else {
+                    renderRankHistoryChart(wrapper, history, kitIntroDate, peakSystemTs);
+                }
+            }, 20);
+        });
+
+        const closeBtn = modal.querySelector('.rank-history-close');
+        if (closeBtn) closeBtn.onclick = () => { modal.style.display = 'none'; };
+        modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+    }
+
+    // Close rank history on Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const rm = document.getElementById('rank-history-modal');
+            if (rm && rm.style.display === 'flex') rm.style.display = 'none';
+        }
+    });
+
+    // Rank History button in player modal — use event delegation
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#rank-history-btn')) return;
+        const modal = document.getElementById('player-modal');
+        const nick = modal.querySelector('.player-modal-name').textContent;
+        const player = allPlayers.find(p => p.nick === nick);
+        if (!player || !player.discordId) return;
+        showRankHistory(nick, player.discordId);
+    });
+
     // Compare button in player modal — use event delegation so it works after data loads
     document.addEventListener('click', (e) => {
         if (!e.target.closest('#compare-btn')) return;
@@ -2101,6 +2623,273 @@ document.addEventListener('DOMContentLoaded', async function () {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && cm.style.display === 'flex') cm.style.display = 'none';
         });
+    })();
+
+    // ===== TIME MACHINE =====
+    (() => {
+        const tmBtn      = document.getElementById('time-machine-btn');
+        const tmDropdown  = document.getElementById('time-machine-dropdown');
+        const tmDateInput = document.getElementById('time-machine-date');
+        const tmApply     = document.getElementById('tm-apply');
+        const tmReset     = document.getElementById('tm-reset');
+        const tmInfo      = document.getElementById('tm-info');
+        if (!tmBtn || !tmDropdown || !tmDateInput || !tmApply || !tmReset) return;
+
+        // Set max date to today
+        const today = new Date();
+        tmDateInput.max = today.toISOString().split('T')[0];
+
+        // Toggle dropdown
+        tmBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = tmDropdown.style.display !== 'none';
+            tmDropdown.style.display = open ? 'none' : 'block';
+        });
+        document.addEventListener('click', (e) => {
+            if (!tmDropdown.contains(e.target) && e.target !== tmBtn && !tmBtn.contains(e.target)) {
+                tmDropdown.style.display = 'none';
+            }
+        });
+
+        // Reconstruct leaderboard at a given timestamp
+        function reconstructAtDate(targetTs) {
+            const currentDiscordIds = new Set(
+                (_originalOverallData || overallData).map(p => p.discordId).filter(Boolean)
+            );
+
+            // Gather all discordIds from tierHistory that belong to current guild's kits
+            const validIcons = new Set(kits.map(k => k.icon));
+            const allDiscordIds = new Set();
+            for (const [did, kitsObj] of Object.entries(tierHistory)) {
+                for (const icon of Object.keys(kitsObj)) {
+                    if (validIcons.has(icon)) { allDiscordIds.add(did); break; }
+                }
+            }
+            // Also include current players
+            currentDiscordIds.forEach(id => allDiscordIds.add(id));
+
+            // Pre-compute peak tier scores using the same function as the overall page
+            const peakScores = {}; // discordId -> kitIcon -> score
+            for (const did of allDiscordIds) {
+                peakScores[did] = {};
+                for (const kit of kits) {
+                    if (!validIcons.has(kit.icon)) continue;
+                    const peakText = getPeakTierTextFromHistory(did, kit.icon);
+                    if (peakText && PEAK_TIER_SCORE[peakText]) {
+                        peakScores[did][kit.icon] = PEAK_TIER_SCORE[peakText];
+                    }
+                }
+            }
+
+            // Kit intro dates (earliest event per kit)
+            const kitIntro = {};
+            for (const did in tierHistory) {
+                for (const kitIcon in tierHistory[did]) {
+                    if (!validIcons.has(kitIcon)) continue;
+                    for (const e of tierHistory[did][kitIcon]) {
+                        const ts = parseCzechDate(e.date);
+                        if (ts && (!kitIntro[kitIcon] || ts < kitIntro[kitIcon])) kitIntro[kitIcon] = ts;
+                    }
+                }
+            }
+
+            const reconstructed = [];
+
+            for (const discordId of allDiscordIds) {
+                const playerHistory = tierHistory[discordId] || {};
+                const tiers = [];
+                let hasAnyTier = false;
+
+                for (const kit of kits) {
+                    const kitEvents = (playerHistory[kit.icon] || [])
+                        .map(ev => ({ ...ev, _ts: parseCzechDate(ev.date) }))
+                        .filter(ev => ev._ts && ev._ts <= targetTs)
+                        .sort((a, b) => a._ts - b._ts || a._rowIdx - b._rowIdx);
+
+                    if (kitEvents.length === 0) {
+                        tiers.push({ tier: undefined, icon: kit.icon });
+                        continue;
+                    }
+
+                    const lastEvent = kitEvents[kitEvents.length - 1];
+                    const tierVal = resolveTierValue(lastEvent.tier);
+                    if (tierVal) {
+                        tiers.push({ tier: tierVal, icon: kit.icon });
+                        hasAnyTier = true;
+                    } else {
+                        tiers.push({ tier: undefined, icon: kit.icon });
+                    }
+                }
+
+                if (!hasAnyTier) continue;
+
+                // Calculate score with peak bonuses and kit intro dates
+                // Peak tier system was introduced on 5.3.2026
+                const PEAK_SYS_TS = new Date(2026, 2, 5).getTime();
+                let score = 0;
+                const pe = peakScores[discordId] || {};
+                tiers.forEach(t => {
+                    const val = parseInt(t.tier);
+                    if (isNaN(val) || val <= 0) return;
+                    // Skip kits not yet introduced at target date
+                    if (kitIntro[t.icon] && targetTs < kitIntro[t.icon]) return;
+                    let peakScore = 0;
+                    let peakText = null;
+                    if (targetTs >= PEAK_SYS_TS && pe[t.icon]) {
+                        peakScore = pe[t.icon];
+                        // Find the peak tier text for display
+                        peakText = getPeakTierTextFromHistory(discordId, t.icon);
+                    }
+                    score += Math.max(val, peakScore);
+                    t.peakTierText = (peakScore > val) ? peakText : null;
+                });
+
+                const isBlacklisted = !currentDiscordIds.has(discordId);
+                const nick = discordIdToNick[discordId] || '???';
+
+                // Find UUID from original data if available
+                const orig = (_originalOverallData || overallData).find(p => p.discordId === discordId);
+
+                reconstructed.push({
+                    uuid: orig ? orig.uuid : null,
+                    nick: nick,
+                    discordId: discordId,
+                    score: score,
+                    tiers: tiers,
+                    hallOfFame: false,
+                    tester: false,
+                    allTestedIcons: new Set()
+                });
+
+                if (isBlacklisted) _tmBlacklistedIds.add(discordId);
+            }
+
+            return reconstructed;
+        }
+
+        // Format date for display
+        function formatDateCz(dateStr) {
+            const d = new Date(dateStr);
+            return d.getDate() + '. ' + (d.getMonth() + 1) + '. ' + d.getFullYear();
+        }
+
+        // Apply time travel
+        tmApply.addEventListener('click', () => {
+            const dateStr = tmDateInput.value;
+            if (!dateStr) {
+                tmInfo.textContent = 'Vyber datum!';
+                tmInfo.style.color = '#ff6b6b';
+                return;
+            }
+
+            const targetDate = new Date(dateStr);
+            targetDate.setHours(23, 59, 59, 999);
+            const targetTs = targetDate.getTime();
+
+            if (targetTs > Date.now()) {
+                tmInfo.textContent = 'Nelze cestovat do budoucnosti!';
+                tmInfo.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Save original data on first travel
+            if (!_originalOverallData) {
+                _originalOverallData = overallData;
+            }
+
+            _tmActive = true;
+            _tmBlacklistedIds = new Set();
+
+            const reconstructed = reconstructAtDate(targetTs);
+
+            if (reconstructed.length === 0) {
+                tmInfo.textContent = 'Žádná data pro toto datum.';
+                tmInfo.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Reset allPlayers so renderOverall can rebuild autocomplete
+            allPlayers = [];
+
+            overallData = reconstructed;
+            renderOverall(overallData);
+
+            // Hide recently tested during time travel
+            const recentEl = document.getElementById('recently-tested');
+            if (recentEl) recentEl.style.display = 'none';
+
+            // Show banner
+            let banner = document.querySelector('.tm-banner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.className = 'tm-banner';
+                const container = document.getElementById('overall-tabulka');
+                if (container) container.parentNode.insertBefore(banner, container);
+            }
+            banner.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Zobrazuješ tierlist z <strong>${formatDateCz(dateStr)}</strong> <button class="tm-banner-close" id="tm-banner-close">✕</button>`;
+            banner.style.display = 'flex';
+            document.getElementById('tm-banner-close').addEventListener('click', () => {
+                timeTravelReset();
+            });
+
+            // UI state
+            tmBtn.classList.add('tm-active');
+            tmReset.style.display = '';
+            tmInfo.textContent = reconstructed.length + ' hráčů nalezeno';
+            tmInfo.style.color = '#aaffaa';
+            tmDropdown.style.display = 'none';
+
+
+        });
+
+        function timeTravelReset() {
+            if (!_originalOverallData) return;
+
+            _tmActive = false;
+            _tmBlacklistedIds = new Set();
+
+            // Reset allPlayers so renderOverall can rebuild autocomplete
+            allPlayers = [];
+
+            overallData = _originalOverallData;
+            _originalOverallData = null;
+            renderOverall(overallData);
+
+            // Remove banner
+            const banner = document.querySelector('.tm-banner');
+            if (banner) banner.style.display = 'none';
+
+            // Restore recently tested
+            const recentEl = document.getElementById('recently-tested');
+            if (recentEl) recentEl.style.display = '';
+
+            // UI state
+            tmBtn.classList.remove('tm-active');
+            tmReset.style.display = 'none';
+            tmInfo.textContent = '';
+        }
+
+        // Reset button
+        tmReset.addEventListener('click', () => {
+            timeTravelReset();
+        });
+
+        // Set min date based on earliest tier history entry
+        setTimeout(() => {
+            let earliest = Infinity;
+            for (const kitsObj of Object.values(tierHistory)) {
+                for (const entries of Object.values(kitsObj)) {
+                    for (const e of entries) {
+                        const ts = parseCzechDate(e.date);
+                        if (ts && ts < earliest) earliest = ts;
+                    }
+                }
+            }
+            if (earliest !== Infinity) {
+                const d = new Date(earliest);
+                tmDateInput.min = d.toISOString().split('T')[0];
+            }
+        }, 2000); // Delay to ensure tierHistory is loaded
     })();
 
 });

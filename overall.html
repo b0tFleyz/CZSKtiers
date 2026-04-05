@@ -23,6 +23,23 @@
         <div id="player-count-container" class="header-player-count"></div>
         <h1 class="main-title">CZSK Tierlist</h1>
         <div class="header-actions">
+            <div class="time-machine-wrap" id="time-machine-wrap">
+                <button class="time-machine-btn" id="time-machine-btn" title="Stroj času – zobraz tierlist z jakéhokoli data">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    <span class="tm-label">Stroj času</span>
+                </button>
+                <div class="time-machine-dropdown" id="time-machine-dropdown" style="display:none;">
+                    <div class="tm-dropdown-header">Zobrazit tierlist z data:</div>
+                    <input type="date" id="time-machine-date" class="tm-date-input">
+                    <div class="tm-actions">
+                        <button class="tm-apply" id="tm-apply">Cestovat</button>
+                        <button class="tm-reset" id="tm-reset" style="display:none;">Zpět na přítomnost</button>
+                    </div>
+                    <div class="tm-info" id="tm-info"></div>
+                </div>
+            </div>
             <a href="https://discord.gg/rAnR4hfKzw" class="discord-link" target="_blank">
                 <img src="kit_icons/discord.png" alt="Discord" class="discord-icon">
                 <span>Discord</span>
@@ -89,6 +106,10 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
             Porovnat
           </button>
+          <button class="compare-btn" id="rank-history-btn" style="display:none;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Rank History
+          </button>
         </div>
         <div class="player-modal-journey-hint">
           <span class="journey-hint-icon">
@@ -98,6 +119,25 @@
           </span>
           Klikni na kit badge pro Tier Journey
         </div>
+      </div>
+    </div>
+
+    <!-- Rank History Modal -->
+    <div id="rank-history-modal" class="rank-history-modal" style="display:none;">
+      <div class="rank-history-content">
+        <span class="rank-history-close">&times;</span>
+        <div class="rank-history-header">
+          <div class="rank-history-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke="#ffe066" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="rank-history-header-text">
+            <div class="rank-history-title"></div>
+            <div class="rank-history-player"></div>
+          </div>
+        </div>
+        <div class="rank-history-timeline-wrapper"></div>
       </div>
     </div>
 
