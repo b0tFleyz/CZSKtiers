@@ -557,11 +557,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Pro zobrazení použij jen top 99
         const sortedPlayers = allSortedPlayers.slice(0, 99);
         
-        // Load previous rankings from localStorage for position change arrows
-        const storageKey = 'prevRanks_' + (_guild || 'czsktiers');
-        let prevRanks = {};
-        try { prevRanks = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch(e) {}
-        
         // Virtuální scrolling - načti jen prvních 20 karet
         const INITIAL_LOAD = 20;
         const LOAD_MORE = 15;
@@ -624,53 +619,30 @@ document.addEventListener('DOMContentLoaded', async function () {
                 `;
             }).join('');
 
-            // Position change indicator
-            const prevRank = prevRanks[player.nick];
-            let posChange = 0; //  0 = same/new
-            if (prevRank !== undefined) {
-                posChange = prevRank - rank; // positive = moved up, negative = moved down
-            }
-
             playerCards.push({
                 rank,
                 rankColor,
                 rankColorRGB,
                 player,
-                kitsHtml,
-                posChange
+                kitsHtml
             });
         });
         
-        // Save current rankings to localStorage
-        const newRanks = {};
-        playerCards.forEach(c => { newRanks[c.player.nick] = c.rank; });
-        try { localStorage.setItem(storageKey, JSON.stringify(newRanks)); } catch(e) {}
-        
         // Funkce pro vytvoření DOM elementu karty
         function createCard(cardData, index) {
-            const { rank, rankColor, rankColorRGB, player, kitsHtml, posChange } = cardData;
+            const { rank, rankColor, rankColorRGB, player, kitsHtml } = cardData;
             const card = document.createElement('div');
-            card.className = 'player-card card-enter' + (posChange > 0 ? ' pos-flash-up' : posChange < 0 ? ' pos-flash-down' : '');
+            card.className = 'player-card card-enter';
             card.style.setProperty('--rank-color', rankColor);
             card.style.setProperty('--rank-color-rgb', rankColorRGB);
             card.style.setProperty('--card-i', String(index));
-
-            // Position change arrow (hidden during time travel)
-            let posHtml = '';
-            if (!_tmActive) {
-                if (posChange > 0) {
-                    posHtml = `<span class="pos-change pos-up" title="+${posChange}"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 2L10 8H2Z" fill="currentColor"/></svg>${posChange}</span>`;
-                } else if (posChange < 0) {
-                    posHtml = `<span class="pos-change pos-down" title="${posChange}"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 10L10 4H2Z" fill="currentColor"/></svg>${Math.abs(posChange)}</span>`;
-                }
-            }
 
             // Score title
             const st = getScoreTitle(player.score);
 
             card.innerHTML = `
                 <div class="card-header compact-row">
-                    <div class="rank-badge" style="background:${rankColor}; color:#23242a;">${rank}${posHtml}</div>
+                    <div class="rank-badge" style="background:${rankColor}; color:#23242a;">${rank}</div>
                     <div class="skin-bg rank-${rank}">
                         <img class="skin" src="https://mc-heads.net/avatar/${player.uuid}/64" alt="${player.nick}" loading="lazy" decoding="async" fetchpriority="${rank <= 3 ? 'high' : 'low'}">
                     </div>
