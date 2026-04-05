@@ -191,6 +191,69 @@
             font-size: 0.9em;
             margin: 0 0 24px;
         }
+        .register-instructions {
+            text-align: center;
+            padding: 8px 0;
+        }
+        .register-steps {
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .register-step {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+        .register-step a, .register-step strong {
+            color: var(--accent);
+        }
+        .register-step code {
+            background: var(--bg-deep);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.95em;
+            color: var(--text-primary);
+        }
+        .step-num {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(var(--accent-rgb), 0.15);
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 0.85em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .discord-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: #5865F2;
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 0.95em;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 16px rgba(88, 101, 242, 0.3);
+        }
+        .discord-btn:hover {
+            background: #4752C4;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 24px rgba(88, 101, 242, 0.4);
+        }
     </style>
 </head>
 <body>
@@ -226,29 +289,48 @@
             </form>
 
             <!-- REGISTER FORM -->
-            <form id="register-form" class="login-form">
-                <div id="register-msg" class="form-message"></div>
-                <div class="form-group">
-                    <label>Ověřovací kód</label>
-                    <input type="text" id="register-code" placeholder="Kód z /verify na Discordu" required maxlength="6" autocomplete="off">
+            <div id="register-form" class="login-form">
+                <div class="register-instructions">
+                    <div class="register-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
+                            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                        </svg>
+                    </div>
+                    <h3 style="margin:12px 0 8px;color:var(--text-primary);">Registrace přes Discord</h3>
+                    <p style="color:var(--text-secondary);font-size:0.9em;line-height:1.6;margin:0 0 20px;">
+                        Pro registraci potřebuješ být na našem Discord serveru.
+                    </p>
+                    <div class="register-steps">
+                        <div class="register-step">
+                            <span class="step-num">1</span>
+                            <span>Připoj se na náš <a href="https://discord.gg/rAnR4hfKzw" target="_blank" style="color:var(--accent);font-weight:600;">Discord server</a></span>
+                        </div>
+                        <div class="register-step">
+                            <span class="step-num">2</span>
+                            <span>Napiš příkaz <code>/verify</code> v jakémkoliv kanálu</span>
+                        </div>
+                        <div class="register-step">
+                            <span class="step-num">3</span>
+                            <span>Bot ti pošle DM s <strong>odkazem</strong> a <strong>kódem</strong></span>
+                        </div>
+                        <div class="register-step">
+                            <span class="step-num">4</span>
+                            <span>Klikni na odkaz, zadej kód a zvol si heslo</span>
+                        </div>
+                        <div class="register-step">
+                            <span class="step-num">5</span>
+                            <span>Vrať se sem a <strong>přihlaš se</strong> svým nickem a heslem</span>
+                        </div>
+                    </div>
+                    <a href="https://discord.gg/rAnR4hfKzw" target="_blank" class="discord-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/></svg>
+                        Připojit se na Discord
+                    </a>
                 </div>
-                <div class="form-group">
-                    <label>Heslo</label>
-                    <input type="password" id="register-password" placeholder="Zvol si heslo (min. 6 znaků)" required minlength="6" autocomplete="new-password">
-                </div>
-                <div class="form-group">
-                    <label>Heslo znovu</label>
-                    <input type="password" id="register-password2" placeholder="Zopakuj heslo" required minlength="6" autocomplete="new-password">
-                </div>
-                <button type="submit" class="form-submit">Zaregistrovat se</button>
-            </form>
+            </div>
 
-            <div class="login-info">
-                <strong>Jak se registrovat?</strong><br>
-                1. Jdi na náš <a href="https://discord.gg/rAnR4hfKzw" target="_blank" style="color:var(--accent)">Discord server</a><br>
-                2. Napiš příkaz <code>/verify</code><br>
-                3. Bot ti pošle kód do DMs spolu s tvým MC nickem<br>
-                4. Zadej kód + heslo zde
+            <div class="login-info" id="login-info-box">
+                <strong>Už máš účet?</strong> Přepni na záložku „Přihlášení" a zadej svůj MC nick a heslo.
             </div>
         </div>
     </div>
@@ -327,32 +409,6 @@
                 showMsg('login-msg', err.message, 'error');
                 btn.disabled = false;
                 btn.textContent = 'Přihlásit se';
-            }
-        });
-
-        // Register
-        document.getElementById('register-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            clearMsg('register-msg');
-            var code = document.getElementById('register-code').value.trim();
-            var password = document.getElementById('register-password').value;
-            var password2 = document.getElementById('register-password2').value;
-
-            if (!code || !password || !password2) return showMsg('register-msg', 'Vyplň všechna pole', 'error');
-            if (password.length < 6) return showMsg('register-msg', 'Heslo musí mít alespoň 6 znaků', 'error');
-            if (password !== password2) return showMsg('register-msg', 'Hesla se neshodují', 'error');
-
-            var btn = this.querySelector('.form-submit');
-            btn.disabled = true;
-            btn.textContent = 'Registrace...';
-            try {
-                await CZSKAuth.register(code, password);
-                showMsg('register-msg', 'Registrace úspěšná! Přesměrovávám...', 'success');
-                setTimeout(redirectAfterAuth, 800);
-            } catch (err) {
-                showMsg('register-msg', err.message, 'error');
-                btn.disabled = false;
-                btn.textContent = 'Zaregistrovat se';
             }
         });
     </script>
