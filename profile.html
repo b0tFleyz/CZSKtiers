@@ -840,6 +840,10 @@
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
             // Also save to Firestore for public visibility
             try {
+                // Ensure Firebase Auth is active (needed for Firestore rules)
+                if (!firebase.auth().currentUser) {
+                    await firebase.auth().signInAnonymously();
+                }
                 var db = firebase.firestore();
                 await db.collection('cardSettings').doc(nick.toLowerCase()).set({
                     banner: settings.banner || '',
