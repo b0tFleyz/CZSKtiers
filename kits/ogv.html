@@ -3,18 +3,17 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#23242a">
-	<title>CZSK Tierlist – Sword</title>
-    <!-- Preconnect to external domains for faster loading -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preconnect" href="https://mc-heads.net">
-    <link rel="preconnect" href="https://docs.google.com">
+	<meta name="theme-color" content="#0f0f10">
+	<title>CZSKSubtiers – OGV</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link rel="preconnect" href="https://mc-heads.net">
+	<link rel="preconnect" href="https://docs.google.com">
 	<link rel="stylesheet" href="../style.css">
 </head>
 <body>
 	<header class="main-header">
-		<h1 class="main-title">CZSK Tierlist</h1>
+		<h1 class="main-title">CZSKSubtiers</h1>
 		<div class="header-actions">
 			<a href="https://discord.gg/rAnR4hfKzw" class="discord-link" target="_blank">
 				<img src="../kit_icons/discord.png" alt="Discord" class="discord-icon">
@@ -35,11 +34,9 @@
 	<nav><ul></ul></nav>
 	<div id="tabulky">
 		<div class="table-container">
-			<div id="sword-tabulka" class="tabulka active"></div>
+			<div id="ogv-tabulka" class="tabulka active"></div>
 		</div>
 	</div>
-
-	<!-- Player Modal -->
 	<div id="player-modal" class="player-modal" style="display:none;">
 		<div class="player-modal-content">
 			<span class="player-modal-close">&times;</span>
@@ -63,11 +60,9 @@
 			</div>
 		</div>
 	</div>
-
 	<section>
 		<p id="konec">Officiální stránka <a id="mctiers" href="https://mctiers.com">MCTiers</a></p>
 	</section>
-	<!-- Tier Journey Modal -->
 	<div id="tier-journey-modal" class="tier-journey-modal" style="display:none;">
 		<div class="tier-journey-content">
 			<span class="tier-journey-close">&times;</span>
@@ -101,6 +96,7 @@
 	<script src="../js/auth.js"></script>
 	<script src="../js/tierjourney.js"></script>
 	<script src="../js/autocomplete.js"></script>
-	<script src="../js/sword.js"></script>
+	<script src="../js/kit-renderer.js"></script>
+	<script src="../js/ogv.js"></script>
 </body>
 </html>

@@ -1,5 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
 	let players = [];
+	const _loadEl = document.getElementById('npot-tabulka');
+	if (_loadEl) _loadEl.innerHTML = '<div class="loading-indicator"><div class="spinner"></div><p>Načítání dat...</p></div>';
 	fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx')
 		.then(res => res.arrayBuffer())
 		.then(data => {
@@ -89,6 +91,8 @@ document.addEventListener('DOMContentLoaded', function () {
 			columns.appendChild(col);
 		}
 		tabulka.appendChild(columns);
+		var tc = players.filter(function(p){ return p.npot !== ''; }).length;
+		if (typeof updatePlayerCount === 'function') updatePlayerCount(tc);
 		
 		// Inicializuj autocomplete
 		if (typeof initAutocomplete === 'function') {

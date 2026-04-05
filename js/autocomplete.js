@@ -314,6 +314,26 @@ function showFullPlayerModal(nick, discordId) {
     // Nastav data
     modal.querySelector('.player-modal-name').textContent = player.nick;
     modal.querySelector('.player-modal-score').textContent = player.score + ' points';
+
+    // Score title badge
+    const scoreTitleEl = modal.querySelector('.player-modal-score-title');
+    if (scoreTitleEl) {
+        const st = getScoreTitleAC(player.score);
+        scoreTitleEl.textContent = st.title;
+        scoreTitleEl.style.color = st.color;
+    }
+    // Days on tierlist
+    const daysEl = modal.querySelector('.player-modal-days');
+    if (daysEl) {
+        const firstDate = getPlayerFirstDateAC(player.discordId);
+        if (firstDate) {
+            const days = Math.floor((Date.now() - firstDate) / (24 * 60 * 60 * 1000));
+            daysEl.textContent = days + ' dní na tierlistu';
+            daysEl.style.display = '';
+        } else {
+            daysEl.style.display = 'none';
+        }
+    }
     
     const modalSkinImg = modal.querySelector('.player-modal-skin');
     modalSkinImg.src = 'https://mc-heads.net/avatar/' + player.uuid + '/64';
@@ -385,6 +405,21 @@ function showFullPlayerModal(nick, discordId) {
         }
     }
     
+    // Achievements
+    const achEl = modal.querySelector('.player-modal-achievements');
+    if (achEl) {
+        const achList = computeAchievementsAC({ name: player.nick, position, score: player.score, tiers: player.tiers, discordId: player.discordId });
+        if (achList.length > 0) {
+            achEl.innerHTML = achList.map(a =>
+                '<span class="achievement-badge" style="--ach-color:' + a.color + ';">' + a.label + '<span class="ach-tip">' + a.desc + '</span></span>'
+            ).join('');
+            achEl.style.display = '';
+        } else {
+            achEl.innerHTML = '';
+            achEl.style.display = 'none';
+        }
+    }
+
     modal.style.display = 'flex';
 }
 
@@ -460,6 +495,67 @@ function showKitPlayerModal(player) {
         
         modal.style.display = 'flex';
     }
+}
+
+function getScoreTitleAC(score) {
+    if (score >= 300) return { title: 'Legenda', color: '#FFCF4A' };
+    if (score >= 200) return { title: 'Elita', color: '#A4B3C7' };
+    if (score >= 100) return { title: 'Šampion', color: '#8F5931' };
+    if (score >= 50)  return { title: 'Bojovník', color: '#6366f1' };
+    return { title: 'Nováček', color: '#655B79' };
+}
+
+function getPlayerFirstDateAC(discordId) {
+    if (!discordId || !kitPageTierHistory[discordId]) return null;
+    let earliest = Infinity;
+    for (const entries of Object.values(kitPageTierHistory[discordId])) {
+        for (const e of entries) {
+            const ts = parseCzechDateAC(e.date);
+            if (ts && ts < earliest) earliest = ts;
+        }
+    }
+    return earliest === Infinity ? null : earliest;
+}
+
+function computeAchievementsAC({ name, position, score, tiers, discordId }) {
+    const achievements = [];
+    const validTiers = (tiers || []).filter(t => t.tier && t.tier !== '-');
+    const testedKits = validTiers.length;
+    // Guild kits count
+    const guild = (typeof getActiveGuild === 'function') ? getActiveGuild() : 'czsktiers';
+    const conf = (typeof getGuildConf === 'function') ? getGuildConf(guild) : null;
+    const guildKitCount = conf ? conf.kits.length : 9;
+
+    if (validTiers.some(t => String(t.tier) === '60')) {
+        achievements.push({ label: 'Kit Master', desc: 'Dosáhl HT1 v některém kitu', color: '#FFCF4A' });
+    }
+    if (position === 1) achievements.push({ label: '#1', desc: '1. místo v celkovém leaderboardu', color: '#eecd14' });
+    else if (position === 2) achievements.push({ label: '#2', desc: '2. místo v celkovém leaderboardu', color: '#c0c0c0' });
+    else if (position === 3) achievements.push({ label: '#3', desc: '3. místo v celkovém leaderboardu', color: '#cd7f32' });
+    if (position >= 4 && position <= 10) {
+        achievements.push({ label: 'Top 10', desc: 'Umístění v top 10 celkového leaderboardu', color: '#6366f1' });
+    }
+    if (testedKits >= guildKitCount && guildKitCount > 0) {
+        achievements.push({ label: 'All-kits', desc: 'Testován ve všech kitech aktuální tierlistu', color: '#34d399' });
+    }
+    const eliteTiers = validTiers.filter(t => ['32','48','60'].includes(String(t.tier)));
+    if (eliteTiers.length >= 3) {
+        achievements.push({ label: 'Elite', desc: '3 nebo více kitů na HT2 nebo výše', color: '#f97316' });
+    }
+    if (discordId && kitPageTierHistory[discordId]) {
+        let earliest = Infinity;
+        for (const entries of Object.values(kitPageTierHistory[discordId])) {
+            for (const e of entries) {
+                const ts = parseCzechDateAC(e.date);
+                if (ts && ts < earliest) earliest = ts;
+            }
+        }
+        const years = (Date.now() - earliest) / (365.25 * 24 * 60 * 60 * 1000);
+        if (years >= 2) {
+            achievements.push({ label: '2+ roky', desc: 'Na tierlistu více než 2 roky', color: '#f59e0b' });
+        }
+    }
+    return achievements;
 }
 
 function initPlayerModal() {

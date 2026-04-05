@@ -18,7 +18,9 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <script>if(sessionStorage.getItem('guildSwitch')){document.body.style.visibility='hidden';}</script>
     <header class="main-header">
+        <div id="player-count-container" class="header-player-count"></div>
         <h1 class="main-title">CZSK Tierlist</h1>
         <div class="header-actions">
             <a href="https://discord.gg/rAnR4hfKzw" class="discord-link" target="_blank">
@@ -39,18 +41,7 @@
     </header>
 
     <nav>
-        <ul>
-            <li><a href="overall.html" class="nav-btn active">Overall<img id="kit" src="kit_icons/trophy.png"></a></li>
-            <li><a href="kits/cpvp.html" class="nav-btn">Cpvp<img id="kit" src="kit_icons/cpvp.png"></a></li>
-            <li><a href="kits/axe.html" class="nav-btn">Axe<img id="kit" src="kit_icons/axe.png"></a></li>
-            <li><a href="kits/sword.html" class="nav-btn">Sword<img id="kit" src="kit_icons/sword.png"></a></li>
-            <li><a href="kits/uhc.html" class="nav-btn">UHC<img id="kit" src="kit_icons/uhc.png"></a></li>
-            <li><a href="kits/npot.html" class="nav-btn">Npot<img id="kit" src="kit_icons/npot.png"></a></li>
-            <li><a href="kits/pot.html" class="nav-btn">Pot<img id="kit" src="kit_icons/pot.png"></a></li>
-            <li><a href="kits/smp.html" class="nav-btn">SMP<img id="kit" src="kit_icons/smp.png"></a></li>
-            <li><a href="kits/diasmp.html" class="nav-btn">DiaSMP<img id="kit" src="kit_icons/diasmp.png"></a></li>
-            <li><a href="kits/mace.html" class="nav-btn">Mace<img id="kit" src="kit_icons/mace.png"></a></li>
-        </ul>
+        <ul></ul>
     </nav>
 
     <div id="tabulky">
@@ -65,7 +56,8 @@
                 <p>Nepodařilo se načíst data z Google Sheets. Zkuste obnovit stránku.</p>
                 <button onclick="location.reload()" class="retry-btn">Zkusit znovu</button>
             </div>
-            <div id="overall-tabulka" class="tabulka active"></div>
+            <div id="recently-tested" class="recently-tested" style="display:none;"></div>
+            <div id="overall-tabulka" class="tabulka active tabulka-loading"></div>
         </div>
     </div>
 
@@ -77,8 +69,17 @@
         <div class="player-modal-position">
           <span class="player-modal-rank"></span>
           <span class="player-modal-score"></span>
+          <span class="player-modal-score-title"></span>
         </div>
+        <div class="player-modal-days" style="display:none;"></div>
         <div class="player-modal-tiers"></div>
+        <div class="player-modal-achievements"></div>
+        <div class="player-modal-actions">
+          <button class="compare-btn" id="compare-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            Porovnat
+          </button>
+        </div>
         <div class="player-modal-journey-hint">
           <span class="journey-hint-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -87,6 +88,21 @@
           </span>
           Klikni na kit badge pro Tier Journey
         </div>
+      </div>
+    </div>
+
+    <!-- Score Graph Modal -->
+    <div id="score-graph-modal" class="score-graph-modal" style="display:none;">
+      <div class="score-graph-content">
+        <span class="score-graph-close">&times;</span>
+        <div class="score-graph-header">
+          <img class="score-graph-skin" src="" alt="">
+          <div class="score-graph-header-text">
+            <div class="score-graph-title"></div>
+            <div class="score-graph-subtitle"></div>
+          </div>
+        </div>
+        <div class="score-graph-chart"></div>
       </div>
     </div>
 
@@ -114,11 +130,44 @@
       </div>
     </div>
 
+    <!-- Compare Modal -->
+    <div id="compare-modal" class="compare-modal" style="display:none;">
+      <div class="compare-modal-content">
+        <span class="compare-modal-close">&times;</span>
+        <h2 class="compare-title">Porovnání hráčů</h2>
+        <div class="compare-players">
+          <div class="compare-player compare-player-left">
+            <img class="compare-skin" src="" alt="">
+            <div class="compare-name"></div>
+            <div class="compare-rank"></div>
+            <div class="compare-score-row"><span class="compare-score"></span><span class="compare-score-title"></span></div>
+          </div>
+          <div class="compare-vs">VS</div>
+          <div class="compare-player compare-player-right">
+            <img class="compare-skin" src="" alt="">
+            <div class="compare-name"></div>
+            <div class="compare-rank"></div>
+            <div class="compare-score-row"><span class="compare-score"></span><span class="compare-score-title"></span></div>
+          </div>
+        </div>
+        <div class="compare-kits"></div>
+        <div class="compare-summary"></div>
+      </div>
+    </div>
+
     <section>
         <p id="konec">Officiální stránka <a id="mctiers" href="https://mctiers.com">MCTiers</a></p>
     </section>
 
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="js/guild-config.js"></script>
+    <script src="js/guild-nav.js"></script>
+    <script src="js/player-count.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script>if(typeof FIREBASE_CONFIG!=='undefined'&&FIREBASE_CONFIG.apiKey&&!FIREBASE_CONFIG.apiKey.startsWith('PASTE'))firebase.initializeApp(FIREBASE_CONFIG);</script>
+    <script src="js/auth.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

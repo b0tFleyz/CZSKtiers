@@ -83,7 +83,12 @@ document.addEventListener('DOMContentLoaded', async function () {
             'Pot': 'kit_icons/pot.png',
             'SMP': 'kit_icons/smp.png',
             'DiaSMP': 'kit_icons/diasmp.png',
-            'Mace': 'kit_icons/mace.png'
+            'Mace': 'kit_icons/mace.png',
+            'Speed': 'kit_icons/speed.png',
+            'OGV': 'kit_icons/OGV.png',
+            'Cart': 'kit_icons/cart.png',
+            'Creeper': 'kit_icons/creeper.png',
+            'DiaVanilla': 'kit_icons/diavanilla.png'
         };
         const rows = XLSX.utils.sheet_to_json(worksheet);
         rows.forEach(row => {
@@ -103,17 +108,29 @@ document.addEventListener('DOMContentLoaded', async function () {
         });
     }
 
-    const kits = [
+    // Guild-aware kit configuration
+    const _guild = (typeof getActiveGuild === 'function') ? getActiveGuild() : 'czsktiers';
+    const _conf = (typeof getGuildConf === 'function') ? getGuildConf(_guild) : null;
+
+    const CZSK_KITS = [
         { key: "Crystal", icon: "kit_icons/cpvp.png" },
         { key: "Axe", icon: "kit_icons/axe.png" },
         { key: "Sword", icon: "kit_icons/sword.png" },
         { key: "UHC", icon: "kit_icons/uhc.png" },
-        { key: "NPot", icon: "kit_icons/npot.png" },
+        { key: "Npot", icon: "kit_icons/npot.png" },
         { key: "Pot", icon: "kit_icons/pot.png" },
         { key: "SMP", icon: "kit_icons/smp.png" },
         { key: "DiaSMP", icon: "kit_icons/diasmp.png" },
         { key: "Mace", icon: "kit_icons/mace.png" }
     ];
+    const SUB_KITS = [
+        { key: "Speed", icon: "kit_icons/speed.png" },
+        { key: "OGV", icon: "kit_icons/OGV.png" },
+        { key: "Cart", icon: "kit_icons/cart.png" },
+        { key: "Creeper", icon: "kit_icons/creeper.png" },
+        { key: "DiaVanilla", icon: "kit_icons/diavanilla.png" }
+    ];
+    const kits = (_guild === 'subtiers') ? SUB_KITS : CZSK_KITS;
 
     // Funkce pro badge: zobrazí všechny badge, s tierem seřazené, neotestované na konci
     function renderSortedBadges(player) {
@@ -236,13 +253,54 @@ document.addEventListener('DOMContentLoaded', async function () {
         const data = await response.arrayBuffer();
         const workbook = XLSX.read(data, { type: 'array' });
 
+        // Pick correct sheet tab for active guild
+        const _sheetTab = _conf ? _conf.sheetTab : null;
+        const _histTab = _conf ? _conf.tierHistoryTab : 'TierHistory';
+
         // Process TierHistory from the same workbook so peak tiers are available immediately
-        const histSheetName = workbook.SheetNames.find(n => n === 'TierHistory');
+        const histSheetName = workbook.SheetNames.find(n => n === _histTab) || workbook.SheetNames.find(n => n === 'TierHistory');
         if (histSheetName) {
             processTierHistoryFromSheet(workbook.Sheets[histSheetName]);
         }
 
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        // Also load the OTHER guild's tier history for cross-guild achievements (Tierlist GOD)
+        const _otherGuild = _guild === 'subtiers' ? 'czsktiers' : 'subtiers';
+        const _otherConf = (typeof getGuildConf === 'function') ? getGuildConf(_otherGuild) : null;
+        if (_otherConf) {
+            const otherHistTab = _otherConf.tierHistoryTab;
+            const otherHistSheet = workbook.SheetNames.find(n => n === otherHistTab);
+            if (otherHistSheet) {
+                processTierHistoryFromSheet(workbook.Sheets[otherHistSheet]);
+            }
+        }
+
+        // Load the other guild's data sheet to check current tiers across both guilds
+        const _otherKits = _otherGuild === 'subtiers' ? SUB_KITS : CZSK_KITS;
+        const _otherSheetTab = _otherConf ? _otherConf.sheetTab : null;
+        let otherWorksheet = _otherSheetTab ? workbook.Sheets[_otherSheetTab] : null;
+        if (!otherWorksheet && _otherGuild === 'czsktiers') otherWorksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const otherGuildCurrentTiers = {}; // discordId → Set<kitIcon>
+        if (otherWorksheet) {
+            const otherRows = XLSX.utils.sheet_to_json(otherWorksheet);
+            otherRows.forEach(row => {
+                const did = row['Discord ID'] ? String(row['Discord ID']).trim() : null;
+                if (!did) return;
+                if (!otherGuildCurrentTiers[did]) otherGuildCurrentTiers[did] = new Set();
+                _otherKits.forEach(kit => {
+                    const val = parseInt(row[kit.key]);
+                    if (!isNaN(val) && val > 0) otherGuildCurrentTiers[did].add(kit.icon);
+                });
+            });
+        }
+
+        // Select data sheet based on guild
+        let worksheet;
+        if (_sheetTab) {
+            worksheet = workbook.Sheets[_sheetTab];
+        }
+        if (!worksheet) {
+            worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        }
         const rows = XLSX.utils.sheet_to_json(worksheet);
 
         // Build Discord ID → Nick map for tier history bridging
@@ -254,17 +312,11 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         overallData = rows.map(row => {
             const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : '';
-            const tiers = [
-                { tier: row.Crystal, icon: "kit_icons/cpvp.png" },
-                { tier: row.Axe, icon: "kit_icons/axe.png" },
-                { tier: row.Sword, icon: "kit_icons/sword.png" },
-                { tier: row.UHC, icon: "kit_icons/uhc.png" },
-                { tier: row.Npot, icon: "kit_icons/npot.png" },
-                { tier: row.Pot, icon: "kit_icons/pot.png" },
-                { tier: row.SMP, icon: "kit_icons/smp.png" },
-                { tier: row.DiaSMP, icon: "kit_icons/diasmp.png" },
-                { tier: row.Mace, icon: "kit_icons/mace.png" }
-            ];
+            // Build tiers dynamically from active guild's kit list
+            const tiers = kits.map(kit => ({
+                tier: row[kit.key],
+                icon: kit.icon
+            }));
             // Score = max(current tier, peak tier bonus) per kit
             let overallScore = 0;
             tiers.forEach(t => {
@@ -278,12 +330,31 @@ document.addEventListener('DOMContentLoaded', async function () {
                     t.peakTierText = (peakScore > val) ? peakText : null;
                 }
             });
+            // Count current-guild tested kits
+            const testedCurrentKits = new Set();
+            tiers.forEach(t => {
+                const val = parseInt(t.tier);
+                if (!isNaN(val) && val > 0) testedCurrentKits.add(t.icon);
+            });
+            // Cross-guild tested kit icons
+            const otherKitSet = (discordId && otherGuildCurrentTiers[discordId]) ? otherGuildCurrentTiers[discordId] : new Set();
+            // Merge with tier history entries for comprehensive coverage
+            const allTestedIcons = new Set([...testedCurrentKits, ...otherKitSet]);
+            if (discordId && tierHistory[discordId]) {
+                for (const icon of Object.keys(tierHistory[discordId])) {
+                    if (tierHistory[discordId][icon].length > 0) allTestedIcons.add(icon);
+                }
+            }
+
             return {
                 uuid: row.UUID,
                 nick: row.Nick,
                 discordId,
                 score: overallScore,
-                tiers: tiers
+                tiers: tiers,
+                hallOfFame: row['HallOfFame'] ? true : false,
+                tester: row['Tester'] ? true : false,
+                allTestedIcons: allTestedIcons
             };
         });
 
@@ -347,6 +418,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         await nactiOverallExcel('https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx');
         // Skryj loading indicator po úspěšném načtení
         if (loadingIndicator) loadingIndicator.style.display = 'none';
+        const tabulka = document.getElementById('overall-tabulka');
+        if (tabulka) tabulka.classList.remove('tabulka-loading');
         // TierHistory is already processed inside nactiOverallExcel from the same workbook
     } catch (error) {
         console.error('Error loading data:', error);
@@ -356,6 +429,28 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     zobrazTabulku('overall-tabulka');
+
+    // Score title based on point range
+    function getScoreTitle(score) {
+        if (score >= 300) return { title: 'Legenda', color: '#FFCF4A' };
+        if (score >= 200) return { title: 'Elita', color: '#A4B3C7' };
+        if (score >= 100) return { title: 'Šampion', color: '#8F5931' };
+        if (score >= 50)  return { title: 'Bojovník', color: '#6366f1' };
+        return { title: 'Nováček', color: '#655B79' };
+    }
+
+    // Get earliest tier history date for a player (how long on tierlist)
+    function getPlayerFirstDate(discordId) {
+        if (!discordId || !tierHistory[discordId]) return null;
+        let earliest = Infinity;
+        for (const entries of Object.values(tierHistory[discordId])) {
+            for (const e of entries) {
+                const ts = parseCzechDate(e.date);
+                if (ts && ts < earliest) earliest = ts;
+            }
+        }
+        return earliest === Infinity ? null : earliest;
+    }
 
     function renderOverall(overallData) {
         const container = document.getElementById('overall-tabulka');
@@ -380,6 +475,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Pro zobrazení použij jen top 99
         const sortedPlayers = allSortedPlayers.slice(0, 99);
         
+        // Load previous rankings from localStorage for position change arrows
+        const storageKey = 'prevRanks_' + (_guild || 'czsktiers');
+        let prevRanks = {};
+        try { prevRanks = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch(e) {}
+        
         // Virtuální scrolling - načti jen prvních 20 karet
         const INITIAL_LOAD = 20;
         const LOAD_MORE = 15;
@@ -399,15 +499,20 @@ document.addEventListener('DOMContentLoaded', async function () {
                 lastRank = rank;
             }
 
-            let rankColor;
-            if (rank === 1) rankColor = '#eecd14';
-            else if (rank === 2) rankColor = '#c0c0c0';
-            else if (rank === 3) rankColor = '#cd7f32';
-            else rankColor = '#555555ff';
+            let rankColor, rankColorRGB;
+            if (rank === 1) { rankColor = '#eecd14'; rankColorRGB = '238,205,20'; }
+            else if (rank === 2) { rankColor = '#c0c0c0'; rankColorRGB = '192,192,192'; }
+            else if (rank === 3) { rankColor = '#cd7f32'; rankColorRGB = '205,127,50'; }
+            else { rankColor = '#555555'; rankColorRGB = '85,85,85'; }
 
             const sortedTiers = player.tiers
                 .filter(t => t.tier && t.tier !== "-")
-                .sort((a, b) => getTierOrder(a.tier) - getTierOrder(b.tier));
+                .sort((a, b) => {
+                    // Sort by effective tier (peak > current) for priority
+                    const aVal = a.peakTierText ? resolveTierValue(a.peakTierText) : String(a.tier);
+                    const bVal = b.peakTierText ? resolveTierValue(b.peakTierText) : String(b.tier);
+                    return getTierOrder(aVal) - getTierOrder(bVal);
+                });
 
             const kitsHtml = sortedTiers.map(t => {
                 const info = tierInfo(String(t.tier));
@@ -437,32 +542,74 @@ document.addEventListener('DOMContentLoaded', async function () {
                 `;
             }).join('');
 
+            // Position change indicator
+            const prevRank = prevRanks[player.nick];
+            let posChange = 0; //  0 = same/new
+            if (prevRank !== undefined) {
+                posChange = prevRank - rank; // positive = moved up, negative = moved down
+            }
+
             playerCards.push({
                 rank,
                 rankColor,
+                rankColorRGB,
                 player,
-                kitsHtml
+                kitsHtml,
+                posChange
             });
         });
         
+        // Save current rankings to localStorage
+        const newRanks = {};
+        playerCards.forEach(c => { newRanks[c.player.nick] = c.rank; });
+        try { localStorage.setItem(storageKey, JSON.stringify(newRanks)); } catch(e) {}
+        
         // Funkce pro vytvoření DOM elementu karty
-        function createCard(cardData) {
-            const { rank, rankColor, player, kitsHtml } = cardData;
+        function createCard(cardData, index) {
+            const { rank, rankColor, rankColorRGB, player, kitsHtml, posChange } = cardData;
             const card = document.createElement('div');
-            card.className = 'player-card';
+            card.className = 'player-card card-enter' + (posChange > 0 ? ' pos-flash-up' : posChange < 0 ? ' pos-flash-down' : '');
+            card.style.setProperty('--rank-color', rankColor);
+            card.style.setProperty('--rank-color-rgb', rankColorRGB);
+            card.style.setProperty('--card-i', String(index));
+
+            // Position change arrow
+            let posHtml = '';
+            if (posChange > 0) {
+                posHtml = `<span class="pos-change pos-up" title="+${posChange}"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 2L10 8H2Z" fill="currentColor"/></svg>${posChange}</span>`;
+            } else if (posChange < 0) {
+                posHtml = `<span class="pos-change pos-down" title="${posChange}"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M6 10L10 4H2Z" fill="currentColor"/></svg>${Math.abs(posChange)}</span>`;
+            }
+
+            // Score title
+            const st = getScoreTitle(player.score);
+
             card.innerHTML = `
                 <div class="card-header compact-row">
-                    <div class="rank-badge" style="background:${rankColor}; color:#23242a;">${rank}</div>
+                    <div class="rank-badge" style="background:${rankColor}; color:#23242a;">${rank}${posHtml}</div>
                     <div class="skin-bg rank-${rank}">
                         <img class="skin" src="https://mc-heads.net/avatar/${player.uuid}/64" alt="${player.nick}" loading="lazy" decoding="async" fetchpriority="${rank <= 3 ? 'high' : 'low'}">
                     </div>
                     <div class="player-info">
                         <div class="player-name">${player.nick}</div>
-                        <div class="score">${player.score}</div>
+                        <div class="score-row">
+                            <span class="score score-clickable" title="Zobrazit graf bodů">${player.score}</span>
+                            <span class="score-title" style="--st-color:${st.color};">${st.title}</span>
+                        </div>
                     </div>
                     <div class="kits-row">${kitsHtml}</div>
                 </div>
             `;
+
+            // Score click — show score history graph
+            const scoreEl = card.querySelector('.score-clickable');
+            if (scoreEl) {
+                scoreEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showScoreGraph(player.nick, player.discordId || '', player.score);
+                });
+            }
+
             card.addEventListener('click', () => {
                 showPlayerModal({
                     name: player.nick,
@@ -472,7 +619,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                     kitsHtml: kitsHtml,
                     tiers: player.tiers,
                     nick: player.nick,
-                    discordId: player.discordId || ''
+                    discordId: player.discordId || '',
+                    hallOfFame: player.hallOfFame,
+                    tester: player.tester,
+                    allTestedIcons: player.allTestedIcons
                 });
             });
             return card;
@@ -482,9 +632,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         function loadMoreCards() {
             const fragment = document.createDocumentFragment();
             const end = Math.min(currentlyLoaded + (currentlyLoaded === 0 ? INITIAL_LOAD : LOAD_MORE), playerCards.length);
+            const batchStart = currentlyLoaded;
             
             for (let i = currentlyLoaded; i < end; i++) {
-                fragment.appendChild(createCard(playerCards[i]));
+                fragment.appendChild(createCard(playerCards[i], i - batchStart));
             }
             
             container.appendChild(fragment);
@@ -515,6 +666,136 @@ document.addEventListener('DOMContentLoaded', async function () {
         });
         
         observer.observe(sentinel);
+        
+        // ========== STATS BADGE (before recently tested so it's always first) ==========
+        renderStatsDashboard(overallData);
+        // ========== RECENTLY TESTED ==========
+        try { renderRecentlyTested(); } catch(e) { console.warn('renderRecentlyTested error:', e); }
+    }
+
+    // ========== STATS: COUNT-UP PLAYER COUNTER ==========
+    function renderStatsDashboard(data) {
+        if (typeof updatePlayerCount === 'function') {
+            updatePlayerCount(data.length);
+        }
+    }
+
+    function renderRecentlyTested() {
+        const recentEl = document.getElementById('recently-tested');
+        if (!recentEl) return;
+        
+        // Collect all tier history entries with dates
+        const allEntries = [];
+        for (const [discordId, kitsObj] of Object.entries(tierHistory)) {
+            for (const [icon, entries] of Object.entries(kitsObj)) {
+                for (const entry of entries) {
+                    if (!entry.date) continue;
+                    // Skip retires (tier starts with R or oldTier exists and tier is retired variant)
+                    const tierStr = String(entry.tier || '').trim();
+                    if (tierStr.startsWith('R')) continue;
+                    // Also detect retires stored as numeric values (e.g. 22 = RLT2)
+                    const resolvedCheck = resolveTierValue(tierStr);
+                    if (resolvedCheck) {
+                        const origCheck = getOriginalTierText(resolvedCheck);
+                        if (origCheck.startsWith('R')) continue;
+                    }
+                    // Skip if this is just a "hold" or no actual tier change
+                    if (entry.oldTier && String(entry.oldTier).trim() === tierStr) continue;
+                    const ts = parseCzechDate(entry.date);
+                    if (!ts) continue;
+                    // Find player nick from discordIdToNick map
+                    const nick = discordIdToNick[discordId] || null;
+                    if (!nick) continue;
+                    // Find UUID from overallData
+                    const playerData = overallData.find(p => p.nick === nick || p.discordId === discordId);
+                    // Skip if player's current tier for this kit is a retire tier
+                    if (playerData) {
+                        const curTierObj = playerData.tiers.find(t => t.icon === icon);
+                        if (curTierObj) {
+                            const curVal = String(curTierObj.tier || '').trim();
+                            const curResolved = resolveTierValue(curVal);
+                            if (curResolved) {
+                                const curOrig = getOriginalTierText(curResolved);
+                                if (curOrig.startsWith('R')) continue;
+                            }
+                        }
+                    }
+                    allEntries.push({
+                        nick,
+                        uuid: playerData ? playerData.uuid : null,
+                        kit: entry.kit,
+                        icon,
+                        tier: entry.tier,
+                        oldTier: entry.oldTier || null,
+                        date: entry.date,
+                        ts
+                    });
+                }
+            }
+        }
+        
+        if (allEntries.length === 0) { recentEl.style.display = 'none'; return; }
+        
+        // Sort by date descending
+        allEntries.sort((a, b) => b.ts - a.ts);
+
+        // Split entries by guild
+        const czskIcons = new Set(CZSK_KITS.map(k => k.icon));
+        const subIcons = new Set(SUB_KITS.map(k => k.icon));
+        const czskEntries = allEntries.filter(e => czskIcons.has(e.icon));
+        const subEntries = allEntries.filter(e => subIcons.has(e.icon));
+
+        function buildCards(entries, limit) {
+            const latest = entries.slice(0, limit);
+            let html = '';
+            for (const e of latest) {
+                const resolved = resolveTierValue(e.tier);
+                const info = resolved ? tierInfo(resolved) : { novyText: e.tier, barvaPozadi: '#655B79', barvaTextu: '#23242a' };
+                const origText = resolved ? getOriginalTierText(resolved) : e.tier;
+                const isR = origText.startsWith('R');
+                const badgeStyle = isR
+                    ? `background:#23242a;color:${info.barvaTextu};border:1px solid ${info.barvaTextu};`
+                    : `background:${info.barvaPozadi};color:#23242a;`;
+                let dirHtml = '';
+                if (e.oldTier) {
+                    const oldVal = resolveTierValue(e.oldTier);
+                    const newVal = resolveTierValue(e.tier);
+                    if (oldVal && newVal) {
+                        const oldIdx = getTierOrder(oldVal);
+                        const newIdx = getTierOrder(newVal);
+                        if (newIdx < oldIdx) dirHtml = '<span class="recent-dir recent-up">&#9650;</span>';
+                        else if (newIdx > oldIdx) dirHtml = '<span class="recent-dir recent-dn">&#9660;</span>';
+                    }
+                }
+                const avatarSrc = e.uuid ? `https://mc-heads.net/avatar/${e.uuid}/32` : '';
+                html += `
+                    <div class="recent-card">
+                        ${avatarSrc ? `<img class="recent-avatar" src="${avatarSrc}" alt="" loading="lazy">` : ''}
+                        <div class="recent-info">
+                            <span class="recent-nick">${e.nick}</span>
+                            <span class="recent-date">${e.date}</span>
+                        </div>
+                        <span class="recent-badge" style="${badgeStyle}">${info.novyText}</span>
+                        ${dirHtml}
+                    </div>`;
+            }
+            return html;
+        }
+
+        let html = '';
+        if (czskEntries.length > 0) {
+            html += '<div class="recent-header">Nedávno testováno — CZSKTiers</div><div class="recent-cards">';
+            html += buildCards(czskEntries, 8);
+            html += '</div>';
+        }
+        if (subEntries.length > 0) {
+            html += '<div class="recent-header">Nedávno testováno — SubTiers</div><div class="recent-cards">';
+            html += buildCards(subEntries, 8);
+            html += '</div>';
+        }
+
+        recentEl.innerHTML = html;
+        recentEl.style.display = '';
     }
 
     // ========== TIER JOURNEY ==========
@@ -789,7 +1070,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     })();
 
     // MODAL funkce
-    function showPlayerModal({ name, position, score, skin, kitsHtml, tiers, nick, discordId }) {
+    function showPlayerModal({ name, position, score, skin, kitsHtml, tiers, nick, discordId, hallOfFame, tester, allTestedIcons }) {
         const modal = document.getElementById('player-modal');
         modal.querySelector('.player-modal-name').textContent = name;
 
@@ -804,6 +1085,25 @@ document.addEventListener('DOMContentLoaded', async function () {
         rankElem.textContent = position + ".";
 
         modal.querySelector('.player-modal-score').textContent = `${score} points`;
+        // Score title in modal
+        const stModal = getScoreTitle(score);
+        const scoreTitleEl = modal.querySelector('.player-modal-score-title');
+        if (scoreTitleEl) {
+            scoreTitleEl.textContent = stModal.title;
+            scoreTitleEl.style.color = stModal.color;
+        }
+        // Days on tierlist in modal
+        const daysEl = modal.querySelector('.player-modal-days');
+        if (daysEl) {
+            const firstDate = getPlayerFirstDate(discordId);
+            if (firstDate) {
+                const days = Math.floor((Date.now() - firstDate) / (24 * 60 * 60 * 1000));
+                daysEl.textContent = `${days} dni na tierlistu`;
+                daysEl.style.display = '';
+            } else {
+                daysEl.style.display = 'none';
+            }
+        }
         const modalSkinImg = modal.querySelector('.player-modal-skin');
         modalSkinImg.src = skin;
         modalSkinImg.loading = 'lazy';
@@ -833,7 +1133,120 @@ document.addEventListener('DOMContentLoaded', async function () {
             });
         }
 
+        // Compute achievements
+        const achEl = modal.querySelector('.player-modal-achievements');
+        if (achEl) {
+            const achList = computeAchievements({ name, position, score, tiers, discordId, hallOfFame, tester, allTestedIcons });
+            if (achList.length > 0) {
+                achEl.innerHTML = achList.map(a =>
+                    `<span class="achievement-badge" style="--ach-color:${a.color};">${a.label}<span class="ach-tip">${a.desc}</span></span>`
+                ).join('');
+                achEl.style.display = '';
+            } else {
+                achEl.innerHTML = '';
+                achEl.style.display = 'none';
+            }
+        }
+
         modal.style.display = 'flex';
+    }
+
+    function computeAchievements({ name, position, score, tiers, discordId, hallOfFame, tester, allTestedIcons }) {
+        const achievements = [];
+        const validTiers = (tiers || []).filter(t => t.tier && t.tier !== '-');
+        const testedKits = validTiers.length;
+        const nick = name || '';
+
+        // --- Special personal achievements ---
+        if (nick === 'ownedbyshifty') {
+            achievements.push({ label: 'Exekutor', desc: 'První tester', color: '#5adc26' });
+        }
+        if (nick === 'EBAN92') {
+            achievements.push({ label: 'Eban', desc: 'Stvořitel tierlistu', color: '#ff0000' });
+        }
+        if (nick === 'Fleyz') {
+            achievements.push({ label: 'Fleyz', desc: 'Spolumajitel, vytvořil bota a stránky', color: '#eb9525' });
+        }
+
+        // --- Position achievements ---
+
+        // Top 3
+        if (position === 1) achievements.push({ label: '#1', desc: '1. místo v celkovém leaderboardu', color: '#eecd14' });
+        else if (position === 2) achievements.push({ label: '#2', desc: '2. místo v celkovém leaderboardu', color: '#c0c0c0' });
+        else if (position === 3) achievements.push({ label: '#3', desc: '3. místo v celkovém leaderboardu', color: '#cd7f32' });
+
+        // Top 10
+        if (position >= 4 && position <= 10) {
+            achievements.push({ label: 'Top 10', desc: 'Umístění v top 10 celkového leaderboardu', color: '#6366f1' });
+        }
+
+        // --- Kit mastery achievements ---
+
+        // Kit Master — has any HT1 tier (value 60)
+        if (validTiers.some(t => String(t.tier) === '60')) {
+            achievements.push({ label: 'Kit Master', desc: 'Dosáhl HT1 v některém kitu', color: '#FFCF4A' });
+        }
+
+        // Elite — has 3+ kits at HT2 or higher (values 32, 48, 60)
+        const eliteTiers = validTiers.filter(t => ['32','48','60'].includes(String(t.tier)));
+        if (eliteTiers.length >= 3) {
+            achievements.push({ label: 'Elite', desc: '3 nebo více kitů na HT2 nebo výše', color: '#f97316' });
+        }
+
+        // All-kits — every kit in current guild has a tier
+        if (testedKits >= kits.length && kits.length > 0) {
+            achievements.push({ label: 'All-kits', desc: 'Testován ve všech kitech', color: '#34d399' });
+        }
+
+        // Tierlist GOD — tested on ALL kits across BOTH guilds (14 total)
+        const ALL_KIT_ICONS = [...CZSK_KITS, ...SUB_KITS].map(k => k.icon);
+        if (allTestedIcons && ALL_KIT_ICONS.every(icon => allTestedIcons.has(icon))) {
+            achievements.push({ label: 'Tierlist GOD', desc: 'Testován ve všech kitech na Tiers i Subtiers', color: '#ef4444' });
+        }
+
+        // --- Milestone achievements ---
+
+        // První kroky — has exactly 1 point
+        if (score === 1) {
+            achievements.push({ label: 'První kroky', desc: 'Získal první bod na tierlistu', color: '#94a3b8' });
+        }
+
+        // --- Time-based achievements ---
+
+        let earliestDate = Infinity;
+        let totalTestCount = 0;
+        if (discordId && tierHistory[discordId]) {
+            for (const entries of Object.values(tierHistory[discordId])) {
+                totalTestCount += entries.length;
+                for (const e of entries) {
+                    const ts = parseCzechDate(e.date);
+                    if (ts && ts < earliestDate) earliestDate = ts;
+                }
+            }
+            const daysSinceFirst = (Date.now() - earliestDate) / (24 * 60 * 60 * 1000);
+            const years = daysSinceFirst / 365.25;
+
+            if (years >= 2) {
+                achievements.push({ label: '2+ roky', desc: 'Na tierlistu více než 2 roky', color: '#f59e0b' });
+            }
+            // Unc — 1000+ days on tierlist
+            if (daysSinceFirst >= 1000) {
+                achievements.push({ label: 'Unc', desc: '1000+ dní na tierlistu', color: '#7c3aed' });
+            }
+        }
+
+        // --- Test count milestones ---
+        if (totalTestCount >= 50) {
+            achievements.push({ label: '50+ testů', desc: 'Absolvoval 50 nebo více testů', color: '#14b8a6' });
+        }
+        if (totalTestCount >= 100) {
+            achievements.push({ label: '100+ testů', desc: 'Absolvoval 100 nebo více testů', color: '#0ea5e9' });
+        }
+        if (totalTestCount >= 200) {
+            achievements.push({ label: '200+ testů', desc: 'Absolvoval 200 nebo více testů', color: '#8b5cf6' });
+        }
+
+        return achievements;
     }
 
     // Zavření modalu
@@ -1040,7 +1453,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                             kitsHtml: kitsHtml,
                             tiers: player.tiers,
                             nick: player.nick,
-                            discordId: player.discordId || ''
+                            discordId: player.discordId || '',
+                            hallOfFame: player.hallOfFame,
+                            tester: player.tester,
+                            allTestedIcons: player.allTestedIcons
                         });
                         searchInput.value = '';
                         suggestionsDiv.classList.remove('active');
@@ -1096,5 +1512,422 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
         });
     }
+
+    // ========== PLAYER COMPARISON ==========
+    let comparePlayerA = null; // stored from player modal
+
+    function getPlayerPosition(nick) {
+        const sorted = [...allPlayers].sort((a, b) => b.score - a.score);
+        let lastScore = null, lastRank = 0;
+        for (let i = 0; i < sorted.length; i++) {
+            const rank = (sorted[i].score === lastScore) ? lastRank : (i + 1);
+            if (sorted[i].nick === nick) return rank;
+            lastScore = sorted[i].score;
+            lastRank = rank;
+        }
+        return null;
+    }
+
+    // ========== SCORE GRAPH ==========
+    function showScoreGraph(playerNick, discordId, currentScore) {
+        const modal = document.getElementById('score-graph-modal');
+        if (!modal) return;
+
+        const player = allPlayers.find(p => p.nick === playerNick);
+        const uuid = player ? player.uuid : playerNick;
+
+        modal.querySelector('.score-graph-skin').src = `https://mc-heads.net/avatar/${uuid}/48`;
+        modal.querySelector('.score-graph-title').textContent = playerNick;
+        modal.querySelector('.score-graph-subtitle').textContent = `${currentScore} bodů · ${getScoreTitle(currentScore).title}`;
+
+        // Build score timeline from tier history
+        // Each tier history entry has: kit, tier, date, oldTier
+        // We reconstruct cumulative score at each date
+        const history = (discordId && tierHistory[discordId]) || {};
+        const events = []; // { ts, date, kitIcon, oldVal, newVal }
+
+        for (const [kitIcon, entries] of Object.entries(history)) {
+            for (const e of entries) {
+                const ts = parseCzechDate(e.date);
+                const newVal = parseInt(resolveTierValue(e.tier)) || 0;
+                const oldVal = e.oldTier ? (parseInt(resolveTierValue(e.oldTier)) || 0) : 0;
+                if (ts) events.push({ ts, date: e.date, kitIcon, oldVal, newVal });
+            }
+        }
+
+        if (events.length === 0) {
+            modal.querySelector('.score-graph-chart').innerHTML = '<div class="score-graph-empty">Žádná historie</div>';
+            modal.style.display = 'flex';
+            return;
+        }
+
+        events.sort((a, b) => a.ts - b.ts);
+
+        // Pre-compute peak tier bonuses per kit (same logic as overall score)
+        const kitPeakScores = {};
+        for (const kitIcon of Object.keys(history)) {
+            const peakTier = getPeakTierTextFromHistory(discordId, kitIcon);
+            kitPeakScores[kitIcon] = peakTier ? (PEAK_TIER_SCORE[peakTier] || 0) : 0;
+        }
+
+        // Compute cumulative score at each event using peak-aware scoring
+        const kitScores = {}; // kitIcon => current raw value
+        const points = []; // { ts, date, score }
+
+        for (const ev of events) {
+            kitScores[ev.kitIcon] = ev.newVal;
+            let total = 0;
+            for (const [kit, rawVal] of Object.entries(kitScores)) {
+                total += Math.max(rawVal, kitPeakScores[kit] || 0);
+            }
+            points.push({ ts: ev.ts, date: ev.date, score: total });
+        }
+
+        // Deduplicate same-date entries (keep last one for each date)
+        const byDate = new Map();
+        for (const p of points) byDate.set(p.date, p);
+        const timeline = [...byDate.values()];
+
+        // Ensure final point matches currentScore (handles kits without history)
+        if (timeline.length > 0 && timeline[timeline.length - 1].score !== currentScore) {
+            const today = new Date();
+            const todayStr = `${today.getDate()}. ${today.getMonth() + 1}. ${today.getFullYear()}`;
+            timeline.push({ ts: Date.now(), date: todayStr, score: currentScore });
+        }
+
+        renderScoreChart(modal.querySelector('.score-graph-chart'), timeline, currentScore);
+        modal.style.display = 'flex';
+    }
+
+    function renderScoreChart(container, timeline, currentScore) {
+        container.innerHTML = '';
+        const W = 700, H = 300;
+        const PL = 50, PR = 20, PT = 20, PB = 40;
+        const plotW = W - PL - PR;
+        const plotH = H - PT - PB;
+
+        const scores = timeline.map(t => t.score);
+        const maxScore = Math.max(...scores, currentScore);
+        const minScore = Math.min(...scores, 0);
+        const range = maxScore - minScore || 1;
+
+        function xFor(i) { return PL + (timeline.length === 1 ? plotW / 2 : (i / (timeline.length - 1)) * plotW); }
+        function yFor(score) { return PT + plotH - ((score - minScore) / range) * plotH; }
+
+        let svg = '';
+
+        // Grid lines (4 horizontal)
+        for (let i = 0; i <= 4; i++) {
+            const val = Math.round(minScore + (range * i / 4));
+            const y = yFor(val);
+            svg += `<line x1="${PL}" y1="${y}" x2="${PL + plotW}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`;
+            svg += `<text x="${PL - 8}" y="${y + 4}" text-anchor="end" font-family="Poppins,sans-serif" font-size="10" fill="rgba(255,255,255,0.35)">${val}</text>`;
+        }
+
+        // Area fill
+        if (timeline.length > 1) {
+            let areaD = `M${xFor(0)},${yFor(timeline[0].score)}`;
+            for (let i = 1; i < timeline.length; i++) areaD += ` L${xFor(i)},${yFor(timeline[i].score)}`;
+            areaD += ` L${xFor(timeline.length - 1)},${PT + plotH} L${xFor(0)},${PT + plotH} Z`;
+            svg += `<path d="${areaD}" fill="url(#scoreGrad)" opacity="0.3"/>`;
+        }
+
+        // Line path
+        if (timeline.length > 1) {
+            let d = `M${xFor(0)},${yFor(timeline[0].score)}`;
+            for (let i = 1; i < timeline.length; i++) d += ` L${xFor(i)},${yFor(timeline[i].score)}`;
+            svg += `<path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+        }
+
+        // Points + invisible hit areas
+        timeline.forEach((t, i) => {
+            const x = xFor(i);
+            const y = yFor(t.score);
+            const isLast = i === timeline.length - 1;
+            if (isLast) svg += `<circle cx="${x}" cy="${y}" r="12" fill="var(--accent)" opacity="0.15"/>`;
+            svg += `<circle cx="${x}" cy="${y}" r="${isLast ? 5 : 4}" fill="var(--accent)" opacity="${isLast ? '1' : '0.7'}"/>`;
+            svg += `<circle cx="${x}" cy="${y}" r="14" fill="transparent" class="score-hit" data-i="${i}" style="cursor:pointer"/>`;
+        });
+
+        // Date labels (max 6)
+        const step = Math.max(1, Math.floor(timeline.length / 5));
+        for (let i = 0; i < timeline.length; i += step) {
+            svg += `<text x="${xFor(i)}" y="${H - 6}" text-anchor="middle" font-family="Poppins,sans-serif" font-size="9" fill="rgba(255,255,255,0.35)">${escapeXml(timeline[i].date)}</text>`;
+        }
+        if (timeline.length > 1) {
+            const last = timeline.length - 1;
+            svg += `<text x="${xFor(last)}" y="${H - 6}" text-anchor="middle" font-family="Poppins,sans-serif" font-size="9" fill="rgba(255,255,255,0.35)">${escapeXml(timeline[last].date)}</text>`;
+        }
+
+        const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svgEl.setAttribute('viewBox', `0 0 ${W} ${H}`);
+        svgEl.setAttribute('width', '100%');
+        svgEl.style.maxWidth = W + 'px';
+        svgEl.innerHTML = `<defs><linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity="0.4"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>` + svg;
+        container.appendChild(svgEl);
+
+        // Tooltip
+        const tip = document.createElement('div');
+        tip.className = 'score-graph-tooltip';
+        container.appendChild(tip);
+
+        svgEl.querySelectorAll('.score-hit').forEach(circle => {
+            circle.addEventListener('mouseenter', (ev) => {
+                const i = parseInt(circle.dataset.i);
+                const t = timeline[i];
+                const st = getScoreTitle(t.score);
+                tip.innerHTML = `<strong>${t.score} bodů</strong><br><span style="color:${st.color}">${st.title}</span><br><span style="opacity:0.6">${t.date}</span>`;
+                tip.style.opacity = '1';
+                const rect = svgEl.getBoundingClientRect();
+                const cx = parseFloat(circle.getAttribute('cx'));
+                const cy = parseFloat(circle.getAttribute('cy'));
+                const scaleX = rect.width / W;
+                const scaleY = rect.height / H;
+                tip.style.left = (cx * scaleX) + 'px';
+                tip.style.top = (cy * scaleY) + 'px';
+            });
+            circle.addEventListener('mouseleave', () => { tip.style.opacity = '0'; });
+        });
+    }
+
+    // Close score graph modal
+    (() => {
+        const sgm = document.getElementById('score-graph-modal');
+        if (!sgm) return;
+        sgm.querySelector('.score-graph-close').onclick = () => { sgm.style.display = 'none'; };
+        sgm.onclick = (e) => { if (e.target === sgm) sgm.style.display = 'none'; };
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && sgm.style.display === 'flex') sgm.style.display = 'none';
+        });
+    })();
+
+    // Compare button in player modal — use event delegation so it works after data loads
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#compare-btn')) return;
+        const modal = document.getElementById('player-modal');
+        const nick = modal.querySelector('.player-modal-name').textContent;
+        const player = allPlayers.find(p => p.nick === nick);
+        if (!player) return;
+        comparePlayerA = player;
+        modal.style.display = 'none';
+        showComparePicker();
+    });
+
+    function showComparePicker() {
+        // Remove old picker if exists
+        let picker = document.getElementById('compare-picker');
+        if (picker) picker.remove();
+
+        // Pre-compute positions once (avoid sorting per-item)
+        const positionMap = {};
+        const sorted = [...allPlayers].sort((a, b) => b.score - a.score);
+        let lastScore = null, lastRank = 0;
+        sorted.forEach((p, i) => {
+            const rank = (p.score === lastScore) ? lastRank : (i + 1);
+            positionMap[p.nick] = rank;
+            lastScore = p.score;
+            lastRank = rank;
+        });
+
+        picker = document.createElement('div');
+        picker.id = 'compare-picker';
+        picker.className = 'compare-picker';
+        picker.innerHTML = `
+            <div class="compare-picker-content">
+                <span class="compare-picker-close">&times;</span>
+                <h3>Vyber hráče pro porovnání</h3>
+                <p class="compare-picker-info">Porovnání s <strong>${comparePlayerA.nick}</strong></p>
+                <div class="compare-picker-search">
+                    <input type="text" class="compare-picker-input" placeholder="Jméno hráče..." autocomplete="off" spellcheck="false">
+                </div>
+                <div class="compare-picker-suggestions"></div>
+            </div>
+        `;
+        document.body.appendChild(picker);
+
+        const closeBtn = picker.querySelector('.compare-picker-close');
+        closeBtn.addEventListener('click', () => picker.remove());
+        picker.addEventListener('mousedown', (e) => { if (e.target === picker) picker.remove(); });
+
+        picker.style.display = 'flex';
+        const input = picker.querySelector('.compare-picker-input');
+        const sugDiv = picker.querySelector('.compare-picker-suggestions');
+
+        let selectedIdx = -1;
+
+        function buildSuggestionHTML(matches) {
+            return matches.map((p, idx) => {
+                const pos = positionMap[p.nick] || '?';
+                const st = getScoreTitle(p.score);
+                return `<div class="compare-picker-item" data-idx="${idx}">
+                    <img src="https://mc-heads.net/avatar/${p.uuid || p.nick}/32" alt="" loading="lazy">
+                    <div class="compare-picker-player-info">
+                        <span class="compare-picker-nick">${p.nick}</span>
+                        <span class="compare-picker-meta">#${pos} · ${p.score} pts · <span style="color:${st.color}">${st.title}</span></span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function getMatches(q) {
+            if (!q) {
+                return sorted
+                    .filter(p => p.nick !== comparePlayerA.nick)
+                    .slice(0, 10);
+            }
+            const starts = [];
+            const includes = [];
+            for (const p of sorted) {
+                if (p.nick === comparePlayerA.nick) continue;
+                const lower = p.nick.toLowerCase();
+                if (lower.startsWith(q)) starts.push(p);
+                else if (lower.includes(q)) includes.push(p);
+                if (starts.length + includes.length >= 10) break;
+            }
+            return [...starts, ...includes].slice(0, 10);
+        }
+
+        function render(query) {
+            selectedIdx = -1;
+            const q = (query || '').trim().toLowerCase();
+            const matches = getMatches(q);
+            if (matches.length === 0) {
+                sugDiv.innerHTML = '<div class="compare-picker-empty">Žádní hráči nenalezeni</div>';
+                return;
+            }
+            sugDiv.innerHTML = buildSuggestionHTML(matches);
+
+            // Click handlers using event delegation
+            sugDiv.onclick = function(e) {
+                const item = e.target.closest('.compare-picker-item');
+                if (!item) return;
+                const idx = parseInt(item.dataset.idx);
+                const playerB = matches[idx];
+                if (playerB) {
+                    picker.remove();
+                    showCompareModal(comparePlayerA, playerB);
+                }
+            };
+        }
+
+        // Initial render
+        render('');
+
+        // Search input — use both input and keyup for maximum compatibility
+        input.addEventListener('input', () => render(input.value));
+
+        input.addEventListener('keydown', (e) => {
+            const items = sugDiv.querySelectorAll('.compare-picker-item');
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIdx = Math.min(selectedIdx + 1, items.length - 1);
+                items.forEach((it, i) => it.classList.toggle('selected', i === selectedIdx));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIdx = Math.max(selectedIdx - 1, 0);
+                items.forEach((it, i) => it.classList.toggle('selected', i === selectedIdx));
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedIdx >= 0 && items[selectedIdx]) items[selectedIdx].click();
+                else if (items.length > 0) items[0].click();
+            } else if (e.key === 'Escape') {
+                picker.remove();
+            }
+        });
+
+        requestAnimationFrame(() => input.focus());
+    }
+
+    function showCompareModal(pA, pB) {
+        const modal = document.getElementById('compare-modal');
+        if (!modal) return;
+
+        const posA = getPlayerPosition(pA.nick);
+        const posB = getPlayerPosition(pB.nick);
+        const stA = getScoreTitle(pA.score);
+        const stB = getScoreTitle(pB.score);
+
+        // Fill left player
+        const left = modal.querySelector('.compare-player-left');
+        left.querySelector('.compare-skin').src = `https://mc-heads.net/avatar/${pA.uuid || pA.nick}/64`;
+        left.querySelector('.compare-name').textContent = pA.nick;
+        left.querySelector('.compare-rank').textContent = `#${posA}`;
+        left.querySelector('.compare-score').textContent = pA.score;
+        left.querySelector('.compare-score-title').textContent = stA.title;
+        left.querySelector('.compare-score-title').style.color = stA.color;
+
+        // Fill right player
+        const right = modal.querySelector('.compare-player-right');
+        right.querySelector('.compare-skin').src = `https://mc-heads.net/avatar/${pB.uuid || pB.nick}/64`;
+        right.querySelector('.compare-name').textContent = pB.nick;
+        right.querySelector('.compare-rank').textContent = `#${posB}`;
+        right.querySelector('.compare-score').textContent = pB.score;
+        right.querySelector('.compare-score-title').textContent = stB.title;
+        right.querySelector('.compare-score-title').style.color = stB.color;
+
+        // Score comparison color
+        left.querySelector('.compare-score').className = 'compare-score' + (pA.score > pB.score ? ' compare-better' : pA.score < pB.score ? ' compare-worse' : '');
+        right.querySelector('.compare-score').className = 'compare-score' + (pB.score > pA.score ? ' compare-better' : pB.score < pA.score ? ' compare-worse' : '');
+
+        // Kit-by-kit comparison
+        const kitsDiv = modal.querySelector('.compare-kits');
+        let kitsHtml = '';
+        let winsA = 0, winsB = 0, draws = 0;
+
+        kits.forEach(kit => {
+            const tierA = getBestTierForKit(pA, kit.icon);
+            const tierB = getBestTierForKit(pB, kit.icon);
+            const valA = tierA ? parseInt(tierA.tier) : 0;
+            const valB = tierB ? parseInt(tierB.tier) : 0;
+            const infoA = tierA ? tierInfo(String(tierA.tier)) : null;
+            const infoB = tierB ? tierInfo(String(tierB.tier)) : null;
+            const origA = tierA ? getOriginalTierText(String(tierA.tier)) : '-';
+            const origB = tierB ? getOriginalTierText(String(tierB.tier)) : '-';
+
+            let winClass = '';
+            if (valA > valB) { winClass = 'win-left'; winsA++; }
+            else if (valB > valA) { winClass = 'win-right'; winsB++; }
+            else if (valA > 0) { draws++; }
+
+            const badgeA = infoA
+                ? `<span class="compare-tier-badge" style="background:${origA.startsWith('R') ? '#23242a' : infoA.barvaPozadi};color:${origA.startsWith('R') ? infoA.barvaTextu : '#23242a'};">${infoA.novyText}</span>`
+                : '<span class="compare-tier-badge compare-tier-none">-</span>';
+            const badgeB = infoB
+                ? `<span class="compare-tier-badge" style="background:${origB.startsWith('R') ? '#23242a' : infoB.barvaPozadi};color:${origB.startsWith('R') ? infoB.barvaTextu : '#23242a'};">${infoB.novyText}</span>`
+                : '<span class="compare-tier-badge compare-tier-none">-</span>';
+
+            kitsHtml += `
+                <div class="compare-kit-row ${winClass}">
+                    <div class="compare-kit-cell compare-kit-left">${badgeA}</div>
+                    <div class="compare-kit-cell compare-kit-center">
+                        <img src="${kit.icon}" alt="" class="compare-kit-icon">
+                    </div>
+                    <div class="compare-kit-cell compare-kit-right">${badgeB}</div>
+                </div>
+            `;
+        });
+        kitsDiv.innerHTML = kitsHtml;
+
+        // Summary
+        const summaryDiv = modal.querySelector('.compare-summary');
+        summaryDiv.innerHTML = `
+            <span class="compare-wins">${pA.nick}: ${winsA}</span>
+            <span class="compare-draw">Remíza: ${draws}</span>
+            <span class="compare-wins">${pB.nick}: ${winsB}</span>
+        `;
+
+        modal.style.display = 'flex';
+    }
+
+    // Close compare modal
+    (() => {
+        const cm = document.getElementById('compare-modal');
+        if (!cm) return;
+        cm.querySelector('.compare-modal-close').onclick = () => { cm.style.display = 'none'; };
+        cm.onclick = (e) => { if (e.target === cm) cm.style.display = 'none'; };
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && cm.style.display === 'flex') cm.style.display = 'none';
+        });
+    })();
 
 });
