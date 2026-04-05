@@ -778,6 +778,9 @@ document.addEventListener('DOMContentLoaded', async function () {
                     }
                     // Skip if this is just a "hold" or no actual tier change
                     if (entry.oldTier && String(entry.oldTier).trim() === tierStr) continue;
+                    // Only show TopResult-level tiers (HT3+), skip LT5-LT3
+                    const numVal = resolvedCheck ? parseInt(resolvedCheck, 10) : NaN;
+                    if (!numVal || numVal <= 10) continue;
                     const ts = parseCzechDate(entry.date);
                     if (!ts) continue;
                     // Find player nick from discordIdToNick map

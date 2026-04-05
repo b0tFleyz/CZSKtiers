@@ -741,33 +741,53 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // Card customization
+        const playerNickForCard = (data.nick || data.name || '').toLowerCase();
         let cardSettings = null;
         try {
+            // Try localStorage first (instant, for own card)
             const auth = window.CZSKAuth && CZSKAuth.getCurrentUser();
-            const isMyCard = auth && auth.nick && auth.nick.toLowerCase() === (data.nick || data.name || '').toLowerCase();
+            const isMyCard = auth && auth.nick && auth.nick.toLowerCase() === playerNickForCard;
             if (isMyCard) {
                 const raw = localStorage.getItem('czsktiers_card_' + auth.nick.toLowerCase());
                 if (raw) cardSettings = JSON.parse(raw);
             }
         } catch(e) {}
 
-        if (cardSettings) {
-            if (banner && cardSettings.banner) { banner.style.background = cardSettings.banner; banner.style.display = ''; }
-            else if (banner) { banner.style.display = 'none'; }
-            if (name && cardSettings.accent) { name.style.color = cardSettings.accent; content.style.borderColor = cardSettings.accent + '33'; }
-            else { if (name) name.style.color = ''; if (content) content.style.borderColor = ''; }
-            if (bioEl && cardSettings.bio) { bioEl.textContent = cardSettings.bio; bioEl.style.display = ''; }
-            else if (bioEl) { bioEl.style.display = 'none'; }
-            if (favkitEl && cardSettings.favoriteKit) {
-                favkitEl.innerHTML = '<span class="favkit-label">Oblíbený kit:</span> <span class="favkit-value">' + cardSettings.favoriteKit + '</span>';
-                favkitEl.style.display = '';
-            } else if (favkitEl) { favkitEl.style.display = 'none'; }
-        } else {
-            if (banner) banner.style.display = 'none';
-            if (bioEl) bioEl.style.display = 'none';
-            if (name) name.style.color = '';
-            if (content) content.style.borderColor = '';
-            if (favkitEl) favkitEl.style.display = 'none';
+        // Apply card settings helper
+        function applyCardSettings(cs) {
+            if (cs) {
+                if (banner && cs.banner) { banner.style.background = cs.banner; banner.style.display = ''; }
+                else if (banner) { banner.style.display = 'none'; }
+                if (name && cs.accent) { name.style.color = cs.accent; content.style.borderColor = cs.accent + '33'; }
+                else { if (name) name.style.color = ''; if (content) content.style.borderColor = ''; }
+                if (bioEl && cs.bio) { bioEl.textContent = cs.bio; bioEl.style.display = ''; }
+                else if (bioEl) { bioEl.style.display = 'none'; }
+                if (favkitEl && cs.favoriteKit) {
+                    favkitEl.innerHTML = '<span class="favkit-label">Oblíbený kit:</span> <span class="favkit-value">' + cs.favoriteKit + '</span>';
+                    favkitEl.style.display = '';
+                } else if (favkitEl) { favkitEl.style.display = 'none'; }
+            } else {
+                if (banner) banner.style.display = 'none';
+                if (bioEl) bioEl.style.display = 'none';
+                if (name) name.style.color = '';
+                if (content) content.style.borderColor = '';
+                if (favkitEl) favkitEl.style.display = 'none';
+            }
+        }
+
+        // Apply immediately if we have localStorage settings
+        applyCardSettings(cardSettings);
+
+        // Load from Firestore for all players (async, updates card when loaded)
+        if (!cardSettings && playerNickForCard) {
+            try {
+                const db = typeof firebase !== 'undefined' && firebase.firestore ? firebase.firestore() : null;
+                if (db) {
+                    db.collection('cardSettings').doc(playerNickForCard).get().then(doc => {
+                        if (doc.exists) applyCardSettings(doc.data());
+                    }).catch(() => {});
+                }
+            } catch(e) {}
         }
 
         // Achievements

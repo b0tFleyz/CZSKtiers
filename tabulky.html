@@ -92,6 +92,12 @@
     </section>
 
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script>if(typeof FIREBASE_CONFIG!=='undefined'&&FIREBASE_CONFIG.apiKey&&!FIREBASE_CONFIG.apiKey.startsWith('PASTE'))firebase.initializeApp(FIREBASE_CONFIG);</script>
+    <script src="js/auth.js"></script>
     <script src="tabulky.js"></script>
 </body>
 </html>
