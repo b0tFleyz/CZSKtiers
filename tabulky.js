@@ -501,7 +501,12 @@ function renderRankHistoryChart(container, history, kitIntroDate) {
         }
         function xForTs(ts) {
             if (lastTs === firstTs) return PL + PLOT_W / 2;
-            return PL + ((ts - firstTs) / (lastTs - firstTs)) * PLOT_W;
+            var bestIdx = 0, bestDist = Infinity;
+            for (var k = 0; k < history.length; k++) {
+                var d = Math.abs(history[k].ts - ts);
+                if (d < bestDist) { bestDist = d; bestIdx = k; }
+            }
+            return xFor(bestIdx);
         }
 
         var svg = '';
