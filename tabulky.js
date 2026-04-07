@@ -500,13 +500,16 @@ function renderRankHistoryChart(container, history, kitIntroDate) {
             return history.length === 1 ? PL + PLOT_W / 2 : PL + (i / (history.length - 1)) * PLOT_W;
         }
         function xForTs(ts) {
-            if (lastTs === firstTs) return PL + PLOT_W / 2;
-            var bestIdx = 0, bestDist = Infinity;
-            for (var k = 0; k < history.length; k++) {
-                var d = Math.abs(history[k].ts - ts);
-                if (d < bestDist) { bestDist = d; bestIdx = k; }
+            if (history.length <= 1) return xFor(0);
+            if (ts <= history[0].ts) return xFor(0);
+            if (ts >= history[history.length - 1].ts) return xFor(history.length - 1);
+            for (var k = 0; k < history.length - 1; k++) {
+                if (ts >= history[k].ts && ts <= history[k + 1].ts) {
+                    var frac = (ts - history[k].ts) / (history[k + 1].ts - history[k].ts);
+                    return xFor(k) + frac * (xFor(k + 1) - xFor(k));
+                }
             }
-            return xFor(bestIdx);
+            return xFor(history.length - 1);
         }
 
         var svg = '';
