@@ -2136,15 +2136,17 @@ document.addEventListener('DOMContentLoaded', async function () {
                 return history.length === 1 ? PL + PLOT_W / 2 : PL + (i / (history.length - 1)) * PLOT_W;
             }
             function xForTs(ts) {
-                if (lastTs === firstTs) return PL + PLOT_W / 2;
-                // Find the closest data-point index so the annotation aligns
-                // with the evenly-spaced dots (xFor) instead of raw time.
-                let bestIdx = 0, bestDist = Infinity;
-                for (let k = 0; k < history.length; k++) {
-                    const d = Math.abs(history[k].ts - ts);
-                    if (d < bestDist) { bestDist = d; bestIdx = k; }
+                if (history.length <= 1) return xFor(0);
+                if (ts <= history[0].ts) return xFor(0);
+                if (ts >= history[history.length - 1].ts) return xFor(history.length - 1);
+                // Interpolate between the two surrounding data points
+                for (let k = 0; k < history.length - 1; k++) {
+                    if (ts >= history[k].ts && ts <= history[k + 1].ts) {
+                        const frac = (ts - history[k].ts) / (history[k + 1].ts - history[k].ts);
+                        return xFor(k) + frac * (xFor(k + 1) - xFor(k));
+                    }
                 }
-                return xFor(bestIdx);
+                return xFor(history.length - 1);
             }
 
             let svg = '';
