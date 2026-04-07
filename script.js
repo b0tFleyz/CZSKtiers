@@ -2137,7 +2137,14 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
             function xForTs(ts) {
                 if (lastTs === firstTs) return PL + PLOT_W / 2;
-                return PL + ((ts - firstTs) / (lastTs - firstTs)) * PLOT_W;
+                // Find the closest data-point index so the annotation aligns
+                // with the evenly-spaced dots (xFor) instead of raw time.
+                let bestIdx = 0, bestDist = Infinity;
+                for (let k = 0; k < history.length; k++) {
+                    const d = Math.abs(history[k].ts - ts);
+                    if (d < bestDist) { bestDist = d; bestIdx = k; }
+                }
+                return xFor(bestIdx);
             }
 
             let svg = '';
