@@ -27,7 +27,7 @@ const GUILD_CONFIG = {
     accentRGB: '99, 102, 241',
     sheetTab: 'SubTiers',
     tierHistoryTab: 'SubTiersTierHistory',
-    discord: 'https://discord.gg/QHnserjc',
+    discord: 'https://discord.gg/B2nuJsFcqK',
     kits: [
       { key: 'Speed',      slug: 'speed',      icon: 'speed.png',      label: 'Speed' },
       { key: 'OGV',        slug: 'ogv',        icon: 'OGV.png',        label: 'OGV' },
