@@ -8,10 +8,8 @@ function renderKitPage(slug, columnKey) {
     if (container) {
       container.innerHTML = '<div class="loading-indicator"><div class="spinner"></div><p>Načítání dat...</p></div>';
     }
-    fetch(XLSX_URL)
-      .then(res => res.arrayBuffer())
-      .then(data => {
-        const workbook = XLSX.read(data, { type: 'array' });
+    getWorkbook()
+      .then(workbook => {
         const guild = getActiveGuild();
         const conf = getGuildConf(guild);
         // Pick correct sheet tab
@@ -140,10 +138,12 @@ function renderKitPage(slug, columnKey) {
       }
     }
 
+    function _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
     function createPlayerDiv(player, isLt, isRetired) {
       const div = document.createElement('div');
       div.className = 'kit-player' + (isLt ? ' kit-player-lt' : '') + (isRetired ? ' kit-player-retired' : '');
-      div.innerHTML = `<img src='https://mc-heads.net/avatar/${player.uuid}/32' alt='skin' loading='lazy'><span>${player.nick}</span>`;
+      div.innerHTML = `<img src='https://mc-heads.net/avatar/${player.uuid}/32' alt='skin' loading='lazy'><span>${_esc(player.nick)}</span>`;
       if (isRetired) {
         const badge = document.createElement('span');
         badge.className = 'retired-badge';

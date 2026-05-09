@@ -7,19 +7,22 @@
  *             + mít <div id="tier-journey-modal"> v HTML
  */
 (function () {
-    const XLSX_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx';
-
     const ICON_MAP = {
-        'Crystal': 'kit_icons/cpvp.png',
-        'Axe':     'kit_icons/axe.png',
-        'Sword':   'kit_icons/sword.png',
-        'UHC':     'kit_icons/uhc.png',
-        'Npot':    'kit_icons/npot.png',
-        'NPot':    'kit_icons/npot.png',
-        'Pot':     'kit_icons/pot.png',
-        'SMP':     'kit_icons/smp.png',
-        'DiaSMP':  'kit_icons/diasmp.png',
-        'Mace':    'kit_icons/mace.png'
+        'Crystal':    'kit_icons/cpvp.png',
+        'Axe':        'kit_icons/axe.png',
+        'Sword':      'kit_icons/sword.png',
+        'UHC':        'kit_icons/uhc.png',
+        'Npot':       'kit_icons/npot.png',
+        'NPot':       'kit_icons/npot.png',
+        'Pot':        'kit_icons/pot.png',
+        'SMP':        'kit_icons/smp.png',
+        'DiaSMP':     'kit_icons/diasmp.png',
+        'Mace':       'kit_icons/mace.png',
+        'Speed':      'kit_icons/speed.png',
+        'OGV':        'kit_icons/OGV.png',
+        'Cart':       'kit_icons/cart.png',
+        'Creeper':    'kit_icons/creeper.png',
+        'DiaVanilla': 'kit_icons/diavanilla.png'
     };
 
     // tierHistoryById[discordId][kitIcon] = [ { tier, date, note, kit, oldTier }, ... ]
@@ -76,15 +79,20 @@
     function _tjGetKitName(icon) {
         const normIcon = icon.replace(/^\.\.\//, '');
         const m = {
-            'kit_icons/cpvp.png':   'Crystal PvP',
-            'kit_icons/axe.png':    'Axe',
-            'kit_icons/sword.png':  'Sword',
-            'kit_icons/uhc.png':    'UHC',
-            'kit_icons/npot.png':   'NPot',
-            'kit_icons/pot.png':    'Pot',
-            'kit_icons/smp.png':    'SMP',
-            'kit_icons/diasmp.png': 'DiaSMP',
-            'kit_icons/mace.png':   'Mace'
+            'kit_icons/cpvp.png':       'Crystal PvP',
+            'kit_icons/axe.png':        'Axe',
+            'kit_icons/sword.png':      'Sword',
+            'kit_icons/uhc.png':        'UHC',
+            'kit_icons/npot.png':       'NPot',
+            'kit_icons/pot.png':        'Pot',
+            'kit_icons/smp.png':        'SMP',
+            'kit_icons/diasmp.png':     'DiaSMP',
+            'kit_icons/mace.png':       'Mace',
+            'kit_icons/speed.png':      'Speed',
+            'kit_icons/OGV.png':        'OGV',
+            'kit_icons/cart.png':       'Cart',
+            'kit_icons/creeper.png':    'Creeper',
+            'kit_icons/diavanilla.png': 'DiaVanilla'
         };
         return m[normIcon] || normIcon;
     }
@@ -255,11 +263,12 @@
 
     // ---- Data loading ----
     function _loadHistory() {
-        fetch(XLSX_URL)
-            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
-            .then(data => {
-                const wb = XLSX.read(data, { type: 'array' });
-                const wsName = wb.SheetNames.find(n => n === 'TierHistory');
+        getWorkbook()
+            .then(wb => {
+                const guild   = typeof getActiveGuild === 'function' ? getActiveGuild() : 'czsktiers';
+                const conf    = typeof getGuildConf  === 'function' ? getGuildConf(guild) : null;
+                const histTab = conf ? conf.tierHistoryTab : 'TierHistory';
+                const wsName  = wb.SheetNames.find(n => n === histTab);
                 if (!wsName) return;
                 const rows = XLSX.utils.sheet_to_json(wb.Sheets[wsName]);
                 rows.forEach(row => {

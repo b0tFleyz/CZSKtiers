@@ -2,73 +2,14 @@ let allPlayers = [];
 let currentSuggestionIndex = -1;
 let fullPlayerData = []; // Plná data pro modal
 let kitPageTierHistory = {}; // discordId → kitIcon → [{tier, oldTier}]
+let _fullDataLoading = false;
 
-const PEAK_TIER_SCORE_AUTOCOMPLETE = {
-    'HT3': 14, 'LT2': 22, 'HT2': 29, 'LT1': 43, 'HT1': 54
-};
-
-function resolveTierValueAC(tier) {
-    tier = String(tier).trim();
-    const validNums = ['1','2','3','5','10','16','24','32','48','60','22','29','43','54'];
-    if (validNums.includes(tier)) return tier;
-    const textMap = {
-        'HT1':'60','LT1':'48','HT2':'32','LT2':'24','HT3':'16',
-        'LT3':'10','HT4':'5','LT4':'3','HT5':'2','LT5':'1',
-        'RHT1':'54','RLT1':'43','RHT2':'29','RLT2':'22'
-    };
-    return textMap[tier.toUpperCase()] || null;
+function _escHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// Parses Czech locale date string "D. M. YYYY" or "D.M.YYYY" into a timestamp
-function parseCzechDateAC(str) {
-    if (!str) return null;
-    const m = str.match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/);
-    if (!m) return null;
-    return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1])).getTime();
-}
-
-// Returns the highest peak tier confirmed by holding it long enough:
-// HT3 = 30 days, LT2/HT2 = 60 days, LT1/HT1 = 90 days
 function getPeakTierTextAC(discordId, kitIcon) {
-    const history = (kitPageTierHistory[discordId] || {})[kitIcon] || [];
-    if (history.length === 0) return null;
-    const TIER_ORDER_AC = ['60','48','32','24','16','10','5','3','2','1','54','43','29','22'];
-    const PEAK_REQUIRED_DAYS_AC = { 'HT3': 30, 'LT2': 60, 'HT2': 60, 'LT1': 90, 'HT1': 90 };
-    const sorted = history
-        .map(e => ({ ...e, ts: parseCzechDateAC(e.date) }))
-        .sort((a, b) => (a.ts || 0) - (b.ts || 0));
-    let confirmedBestOrder = 999;
-    let confirmedBestTier = null;
-    for (let i = 0; i < sorted.length; i++) {
-        const entry = sorted[i];
-        const tier = String(entry.tier || '').trim();
-        if (!tier || tier.startsWith('R')) continue;
-        if (!PEAK_REQUIRED_DAYS_AC[tier]) continue;
-        const oldTier = String(entry.oldTier || '').trim();
-        if (oldTier === tier) continue; // holds event, not a promotion
-        const startDate = entry.ts;
-        if (!startDate) continue;
-        let endDate = Date.now();
-        for (let j = i + 1; j < sorted.length; j++) {
-            const next = sorted[j];
-            if (String(next.oldTier || '').trim() === tier && next.ts) {
-                endDate = next.ts;
-                break;
-            }
-        }
-        const heldDays = (endDate - startDate) / (24 * 60 * 60 * 1000);
-        if (heldDays >= PEAK_REQUIRED_DAYS_AC[tier]) {
-            const tierVal = resolveTierValueAC(tier);
-            if (tierVal) {
-                const order = TIER_ORDER_AC.indexOf(tierVal);
-                if (order !== -1 && order < confirmedBestOrder) {
-                    confirmedBestOrder = order;
-                    confirmedBestTier = tier;
-                }
-            }
-        }
-    }
-    return confirmedBestTier;
+    return computePeakTierText((kitPageTierHistory[discordId] || {})[kitIcon] || []);
 }
 
 function initAutocomplete(players) {
@@ -112,11 +53,12 @@ function initAutocomplete(players) {
 
         // Vygeneruj návrhy
         suggestionsDiv.innerHTML = matches.map((player, index) => {
+            const nickEsc = _escHtml(player.nick);
             return `
-                <div class="search-suggestion-item" data-index="${index}" data-nick="${player.nick}" data-discord-id="${player.discordId || ''}">
-                    <img src="https://mc-heads.net/avatar/${player.uuid || player.nick}/36" alt="${player.nick}" class="player-avatar">
+                <div class="search-suggestion-item" data-index="${index}" data-nick="${nickEsc}" data-discord-id="${player.discordId || ''}">
+                    <img src="https://mc-heads.net/avatar/${player.uuid || player.nick}/36" alt="${nickEsc}" class="player-avatar">
                     <div class="player-details">
-                        <div class="name">${player.nick}</div>
+                        <div class="name">${nickEsc}</div>
                     </div>
                 </div>
             `;
@@ -191,13 +133,14 @@ function updateSuggestionSelection(suggestions) {
 }
 
 function loadFullPlayerData() {
+    if (fullPlayerData.length > 0 || _fullDataLoading) return;
+    _fullDataLoading = true;
+
     const _guild = (typeof getActiveGuild === 'function') ? getActiveGuild() : 'czsktiers';
     const _conf = (typeof getGuildConf === 'function') ? getGuildConf(_guild) : null;
 
-    fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx')
-        .then(res => res.arrayBuffer())
-        .then(data => {
-            const workbook = XLSX.read(data, { type: 'array' });
+    getWorkbook()
+        .then(workbook => {
 
             // Load TierHistory for peak tier data
             kitPageTierHistory = {};
@@ -277,7 +220,7 @@ function loadFullPlayerData() {
                     if (!isNaN(num)) {
                         const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : '';
                         const peakText = discordId ? getPeakTierTextAC(discordId, t.icon) : null;
-                        const peakScore = peakText ? (PEAK_TIER_SCORE_AUTOCOMPLETE[peakText] || 0) : 0;
+                        const peakScore = peakText ? (PEAK_TIER_SCORE[peakText] || 0) : 0;
                         overallScore += Math.max(num, peakScore);
                         t.peakTierText = (peakScore > num) ? peakText : null;
                     }
@@ -292,7 +235,10 @@ function loadFullPlayerData() {
                 };
             });
         })
-        .catch(err => console.error('Error loading full player data:', err));
+        .catch(err => {
+            _fullDataLoading = false;
+            console.error('Error loading full player data:', err);
+        });
 }
 
 function showFullPlayerModal(nick, discordId) {
@@ -342,7 +288,7 @@ function showFullPlayerModal(nick, discordId) {
     // Score title badge
     const scoreTitleEl = modal.querySelector('.player-modal-score-title');
     if (scoreTitleEl) {
-        const st = getScoreTitleAC(player.score);
+        const st = getScoreTitle(player.score);
         scoreTitleEl.textContent = st.title;
         scoreTitleEl.style.color = st.color;
     }
@@ -378,37 +324,28 @@ function showFullPlayerModal(nick, discordId) {
     // Vygeneruj kits HTML stejně jako v script.js
     const sortedTiers = player.tiers
         .filter(t => t.tier && t.tier !== "-")
-        .sort((a, b) => {
-            const TIER_ORDER = ["60", "48", "32", "24", "16", "10", "5", "3", "2", "1", "54", "43", "29", "22"];
-            const aIdx = TIER_ORDER.indexOf(String(a.tier));
-            const bIdx = TIER_ORDER.indexOf(String(b.tier));
-            return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
-        });
-    
+        .sort((a, b) => getTierOrder(String(a.tier)) - getTierOrder(String(b.tier)));
+
     const kitsHtml = sortedTiers.map(t => {
-        const info = getTierInfoForModal(String(t.tier));
+        const info = tierInfo(String(t.tier));
         const origText = getOriginalTierText(String(t.tier));
-        let style = "";
-        let circleColor = "";
-        
-        if (origText.startsWith("R")) {
-            style = "background:#23242a;color:" + info.color + ";";
-            circleColor = "#23242a";
-        } else {
-            style = "background:" + info.color + ";color:#23242a;";
-            circleColor = info.color;
-        }
-        
-        return '<span class="kit-badge tooltip" style="--tier-color:' + info.color + ';" data-kit-icon="' + t.icon + '" data-kit-tier="' + t.tier + '">' +
+        const isRetired = origText.startsWith("R");
+        const style = isRetired
+            ? "background:#23242a;color:" + info.barvaTextu + ";"
+            : "background:" + info.barvaPozadi + ";color:#23242a;";
+        const circleColor = isRetired ? "#23242a" : info.barvaPozadi;
+        const tierColor = isRetired ? info.barvaTextu : info.barvaPozadi;
+
+        return '<span class="kit-badge tooltip" style="--tier-color:' + tierColor + ';" data-kit-icon="' + t.icon + '" data-kit-tier="' + t.tier + '">' +
             '<span class="kit-icon-circle" style="border-color:' + circleColor + ';">' +
             '<img src="../' + t.icon + '" alt="" class="kit-icon" loading="lazy">' +
             '</span>' +
             '<span class="kit-tier-text" style="' + style + '">' +
-            info.text +
+            info.novyText +
             '</span>' +
             '<span class="tooltiptext">' +
             '<strong>' + origText + '</strong><br>' +
-            (t.peakTierText ? PEAK_TIER_SCORE_AUTOCOMPLETE[t.peakTierText] : t.tier) + ' pts' +
+            (t.peakTierText ? PEAK_TIER_SCORE[t.peakTierText] : t.tier) + ' pts' +
             (t.peakTierText ? '<br><span style="font-size:0.85em;opacity:0.7;">Peak: ' + t.peakTierText + '</span>' : '') +
             '</span>' +
             '</span>';
@@ -447,45 +384,6 @@ function showFullPlayerModal(nick, discordId) {
     modal.style.display = 'flex';
 }
 
-function getOriginalTierText(hodnota) {
-    switch (hodnota) {
-        case "22": return "RLT2";
-        case "29": return "RHT2";
-        case "43": return "RLT1";
-        case "54": return "RHT1";
-        case "32": return "HT2";
-        case "16": return "HT3";
-        case "10": return "LT3";
-        case "5": return "HT4";
-        case "3": return "LT4";
-        case "2": return "HT5";
-        case "1": return "LT5";
-        case "24": return "LT2";
-        case "48": return "LT1";
-        case "60": return "HT1";
-        default: return "-";
-    }
-}
-
-function getTierInfoForModal(tier) {
-    const tierMap = {
-        '60': { text: 'HT1', color: '#FFCF4A' },
-        '54': { text: 'HT1', color: '#FFCF4A' },
-        '48': { text: 'LT1', color: '#D5B355' },
-        '43': { text: 'LT1', color: '#D5B355' },
-        '32': { text: 'HT2', color: '#A4B3C7' },
-        '29': { text: 'HT2', color: '#A4B3C7' },
-        '24': { text: 'LT2', color: '#888D95' },
-        '22': { text: 'LT2', color: '#888D95' },
-        '16': { text: 'HT3', color: '#8F5931' },
-        '10': { text: 'LT3', color: '#B56326' },
-        '5': { text: 'HT4', color: '#655B79' },
-        '3': { text: 'LT4', color: '#655B79' },
-        '2': { text: 'HT5', color: '#655B79' },
-        '1': { text: 'LT5', color: '#655B79' }
-    };
-    return tierMap[tier] || { text: tier, color: '#EEE0CB' };
-}
 
 function showKitPlayerModal(player) {
     // Pro zpětnou kompatibilitu - použij full modal pokud jsou data k dispozici
@@ -521,20 +419,13 @@ function showKitPlayerModal(player) {
     }
 }
 
-function getScoreTitleAC(score) {
-    if (score >= 300) return { title: 'Legenda', color: '#FFCF4A' };
-    if (score >= 200) return { title: 'Elita', color: '#A4B3C7' };
-    if (score >= 100) return { title: 'Šampion', color: '#8F5931' };
-    if (score >= 50)  return { title: 'Bojovník', color: '#6366f1' };
-    return { title: 'Nováček', color: '#655B79' };
-}
 
 function getPlayerFirstDateAC(discordId) {
     if (!discordId || !kitPageTierHistory[discordId]) return null;
     let earliest = Infinity;
     for (const entries of Object.values(kitPageTierHistory[discordId])) {
         for (const e of entries) {
-            const ts = parseCzechDateAC(e.date);
+            const ts = parseCzechDate(e.date);
             if (ts && ts < earliest) earliest = ts;
         }
     }
@@ -570,7 +461,7 @@ function computeAchievementsAC({ name, position, score, tiers, discordId }) {
         let earliest = Infinity;
         for (const entries of Object.values(kitPageTierHistory[discordId])) {
             for (const e of entries) {
-                const ts = parseCzechDateAC(e.date);
+                const ts = parseCzechDate(e.date);
                 if (ts && ts < earliest) earliest = ts;
             }
         }

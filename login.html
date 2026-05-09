@@ -7,6 +7,7 @@
     <title>CZSK Tierlist – Přihlášení</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap">
     <link rel="stylesheet" href="style.css">
     <style>
         body {
@@ -354,7 +355,15 @@
 
         // Get return URL from query params (when redirected from bot tunnel for registration)
         var params = new URLSearchParams(location.search);
-        var returnUrl = params.get('return');
+        var returnUrl = (function() {
+            var raw = params.get('return');
+            if (!raw) return null;
+            try {
+                var parsed = new URL(raw, location.origin);
+                // Only allow same-origin redirects to prevent open redirect attacks
+                return parsed.origin === location.origin ? parsed.href : null;
+            } catch { return null; }
+        })();
 
         function redirectAfterAuth() {
             var auth = JSON.parse(localStorage.getItem('czsktiers_auth') || '{}');

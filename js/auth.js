@@ -11,7 +11,15 @@
         const data = JSON.parse(decodeURIComponent(hash.slice(6)));
         if (data.token && data.nick) {
           setAuth(data);
-          if (data.apiUrl) localStorage.setItem('czsktiers_api_url', data.apiUrl);
+          if (data.apiUrl) {
+            try {
+              var parsedApi = new URL(data.apiUrl);
+              // Only store same-origin API URLs to prevent redirect to attacker-controlled servers
+              if (parsedApi.origin === location.origin) {
+                localStorage.setItem('czsktiers_api_url', data.apiUrl);
+              }
+            } catch {}
+          }
           history.replaceState(null, '', location.pathname + location.search);
           return true;
         }

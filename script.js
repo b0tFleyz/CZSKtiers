@@ -37,71 +37,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         'Creeper':'kit_icons/creeper.png','DiaVanilla':'kit_icons/diavanilla.png'
     };
 
-    const TIER_ORDER = [
-        "60", "48", "32", "24", "16", "10", "5", "3", "2", "1",
-        "54", "43", "29", "22"
-    ];
-
-    // Points awarded for peak tier (for players not yet retired)
-    // HT3 peak = 14, LT2+ uses same bonus as the retire score
-    const PEAK_TIER_SCORE = {
-        'HT3': 14, 'LT2': 22, 'HT2': 29, 'LT1': 43, 'HT1': 54
-    };
-
-    function getTierOrder(tier) {
-        const idx = TIER_ORDER.indexOf(String(tier));
-        return idx === -1 ? 999 : idx;
-    }
-
-    // Parses Czech locale date string "D. M. YYYY" or "D.M.YYYY" into a timestamp
-    function parseCzechDate(str) {
-        if (!str) return null;
-        const m = str.match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/);
-        if (!m) return null;
-        return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1])).getTime();
-    }
-
-    // Returns the highest peak tier confirmed by holding it long enough:
-    // HT3 = 30 days, LT2/HT2 = 60 days, LT1/HT1 = 90 days
     function getPeakTierTextFromHistory(discordId, kitIcon) {
-        const history = (tierHistory[discordId] || {})[kitIcon] || [];
-        if (history.length === 0) return null;
-        const PEAK_REQUIRED_DAYS = { 'HT3': 30, 'LT2': 60, 'HT2': 60, 'LT1': 90, 'HT1': 90 };
-        const sorted = history
-            .map(e => ({ ...e, ts: parseCzechDate(e.date) }))
-            .sort((a, b) => (a.ts || 0) - (b.ts || 0));
-        let confirmedBestOrder = 999;
-        let confirmedBestTier = null;
-        for (let i = 0; i < sorted.length; i++) {
-            const entry = sorted[i];
-            const tier = String(entry.tier || '').trim();
-            if (!tier || tier.startsWith('R')) continue;
-            if (!PEAK_REQUIRED_DAYS[tier]) continue;
-            const oldTier = String(entry.oldTier || '').trim();
-            if (oldTier === tier) continue; // holds event, not a promotion
-            const startDate = entry.ts;
-            if (!startDate) continue;
-            let endDate = Date.now();
-            for (let j = i + 1; j < sorted.length; j++) {
-                const next = sorted[j];
-                if (String(next.oldTier || '').trim() === tier && next.ts) {
-                    endDate = next.ts;
-                    break;
-                }
-            }
-            const heldDays = (endDate - startDate) / (24 * 60 * 60 * 1000);
-            if (heldDays >= PEAK_REQUIRED_DAYS[tier]) {
-                const tierVal = resolveTierValue(tier);
-                if (tierVal) {
-                    const order = getTierOrder(tierVal);
-                    if (order < confirmedBestOrder) {
-                        confirmedBestOrder = order;
-                        confirmedBestTier = tier;
-                    }
-                }
-            }
-        }
-        return confirmedBestTier;
+        return computePeakTierText((tierHistory[discordId] || {})[kitIcon] || []);
     }
 
     // Extracts peak tier info from TierHistory worksheet (already in-memory)
@@ -171,118 +108,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     ];
     const kits = (_guild === 'subtiers') ? SUB_KITS : CZSK_KITS;
 
-    // Funkce pro badge: zobrazí všechny badge, s tierem seřazené, neotestované na konci
-    function renderSortedBadges(player) {
-        // Pro každý kit vždy vygeneruj badge (i když není v player.tiers)
-        const badgeList = kits.map(kit => {
-            // Najdi nejlepší tier pro tento kit
-            const kitTiers = (player.tiers || []).filter(t => t.icon === kit.icon && t.tier && t.tier !== "-");
-            if (kitTiers.length === 0) {
-                // Hráč nemá žádný záznam pro tento kit → neotestovaný
-                return {
-                    html: `
-<span class="kit-badge kit-badge-missing">
-    <span class="kit-icon-circle kit-icon-missing">
-        <svg width="22" height="22">
-            <circle cx="11" cy="11" r="9" fill="#23242a" stroke="#444" stroke-width="1"/>
-        </svg>
-    </span>
-    <span class="kit-tier-text kit-tier-missing">?</span>
-</span>
-                    `,
-                    order: 999
-                };
-            }
-            // Najdi nejlepší tier podle pořadí
-            kitTiers.sort((a, b) => getTierOrder(a.tier) - getTierOrder(b.tier));
-            const t = kitTiers[0];
-            const info = tierInfo(String(t.tier));
-            const origText = getOriginalTierText(String(t.tier));
-            let style = "";
-            let circleColor = "";
-            if (origText.startsWith("R")) {
-                style = `background:#23242a;color:${info.barvaTextu};`;
-                circleColor = "#23242a";
-            } else {
-                style = `background:${info.barvaPozadi};color:#23242a;`;
-                circleColor = info.barvaPozadi;
-            }
-            return {
-                html: `
-<span class="kit-badge tooltip">
-    <span class="kit-icon-circle" style="border-color:` + circleColor + `;">
-        <img src="` + kit.icon + `" alt="" class="kit-icon" loading="lazy">
-    </span>
-    <span class="kit-tier-text" style="` + style + `">
-        ` + info.novyText + `
-    </span>
-    <span class="tooltiptext">
-        <strong>` + origText + `</strong><br>
-        ` + (t.peakTierText ? PEAK_TIER_SCORE[t.peakTierText] : t.tier) + ` pts` + (t.peakTierText ? `<br><span style="font-size:0.85em;opacity:0.7;">Peak: ` + t.peakTierText + `</span>` : '') + `
-    </span>
-</span>
-            `,
-                order: getTierOrder(t.tier)
-            };
-        });
-
-    // Zobraz pouze badge s tierem (order < 999), seřazené podle tieru
-    const tested = badgeList.filter(b => b.order < 999).sort((a, b) => a.order - b.order);
-    return tested.map(b => b.html).join('');
-    }
-
-    // Vrací pole tierů hráče ve správném pořadí
-    function sortPlayerTiers(tiers) {
-        return [...tiers].sort((a, b) => getTierOrder(a.tier) - getTierOrder(b.tier));
-    }
-
-    // Vrací HT1, LT2 atd. pro badge, ale tooltip ukazuje původní text (např. RHT1)
-    function tierInfo(hodnota) {
-        let novyText = hodnota;
-        let barvaTextu = "#23242a";
-        let barvaPozadi = "#EEE0CB";
-        switch (hodnota) {
-            case "32": novyText = "HT2"; barvaPozadi = "#A4B3C7"; break;
-            case "16": novyText = "HT3"; barvaPozadi = "#8F5931"; break;
-            case "10": novyText = "LT3"; barvaPozadi = "#B56326"; break;
-            case "5": novyText = "HT4"; barvaPozadi = "#655B79"; break;
-            case "3": novyText = "LT4"; barvaPozadi = "#655B79"; break;
-            case "2": novyText = "HT5"; barvaPozadi = "#655B79"; break;
-            case "1": novyText = "LT5"; barvaPozadi = "#655B79"; break;
-            case "24": novyText = "LT2"; barvaPozadi = "#888D95"; break;
-            case "48": novyText = "LT1"; barvaPozadi = "#D5B355"; break;
-            case "60": novyText = "HT1"; barvaPozadi = "#FFCF4A"; break;
-            // Přemapování RHT/RTL na normální HT/LT
-            case "22": novyText = "LT2"; barvaTextu = "#888D95"; barvaPozadi = "#23242a"; break; // RTL2 → LT2
-            case "29": novyText = "HT2"; barvaTextu = "#A4B3C7"; barvaPozadi = "#23242a"; break; // RHT2 → HT2
-            case "43": novyText = "LT1"; barvaTextu = "#D5B355"; barvaPozadi = "#23242a"; break; // RTL1 → LT1
-            case "54": novyText = "HT1"; barvaTextu = "#FFCF4A"; barvaPozadi = "#23242a"; break; // RHT1 → HT1
-            default: barvaPozadi = "#EEE0CB"; break;
-        }
-        return { novyText, barvaTextu, barvaPozadi };
-    }
-
-    // Vrací původní text tieru pro tooltip
-    function getOriginalTierText(hodnota) {
-        switch (hodnota) {
-            case "22": return "RLT2";
-            case "29": return "RHT2";
-            case "43": return "RLT1";
-            case "54": return "RHT1";
-            case "32": return "HT2";
-            case "16": return "HT3";
-            case "10": return "LT3";
-            case "5": return "HT4";
-            case "3": return "LT4";
-            case "2": return "HT5";
-            case "1": return "LT5";
-            case "24": return "LT2";
-            case "48": return "LT1";
-            case "60": return "HT1";
-            default: return "-";
-        }
-    }
-
     let overallData = [];
     let discordIdToNick = {}; // Discord ID → Nick, built from spreadsheet data
     let tierHistory = {}; // keyed by discordId → kitIcon → [{tier, date, note, kit, oldTier}]
@@ -302,10 +127,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         } catch { return null; }
     }
     // Načti overall jako pole objektů a vygeneruj karty
-    async function nactiOverallExcel(url) {
-        const response = await fetch(url);
-        const data = await response.arrayBuffer();
-        const workbook = XLSX.read(data, { type: 'array' });
+    async function nactiOverallExcel() {
+        const workbook = await getWorkbook();
 
         // Pick correct sheet tab for active guild
         const _sheetTab = _conf ? _conf.sheetTab : null;
@@ -443,82 +266,19 @@ document.addEventListener('DOMContentLoaded', async function () {
         renderOverall(overallData);
     }
 
-    // Ostatní tabulky nech původní
-    async function nactiExcel(nazevSouboru, idTabulky) {
-        try {
-            const response = await fetch(nazevSouboru);
-            const data = await response.arrayBuffer();
-            const workbook = XLSX.read(data, { type: 'array' });
-            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            const html = XLSX.utils.sheet_to_html(worksheet);
-            const tabulka = document.getElementById(idTabulky);
-            if (!tabulka) {
-                console.warn('Element s id "' + idTabulky + '" nebyl na stránce nalezen, přeskočeno.');
-                return;
-            }
-            tabulka.innerHTML = html;
-            const firstTr = tabulka.querySelector('tr:first-child');
-            if (firstTr) firstTr.remove();
-        } catch (error) {
-            console.error("Chyba při načítání Excelu:", error);
-        }
-    }
-
-    // Přepínání kategorií
-    function zobrazTabulku(idTabulky) {
-        const vsechnyTabulky = document.querySelectorAll('.tabulka');
-        vsechnyTabulky.forEach(tabulka => tabulka.classList.remove('active'));
-
-        const vybranaTabulka = document.getElementById(idTabulky);
-        if (vybranaTabulka) {
-            vybranaTabulka.classList.add('active');
-        }
-    }
-
-    // Navigace: správné přesměrování na overall.html nebo tabulky.html#kit-table
-    const odkazy = document.querySelectorAll('nav a');
-    odkazy.forEach(odkaz => {
-        odkaz.addEventListener('click', function (event) {
-            const href = odkaz.getAttribute('href');
-            if (href.includes('overall.html')) {
-                // Přímé přesměrování na overall.html bez hash
-                window.location.href = 'overall.html';
-                event.preventDefault();
-            } else if (href.includes('tabulky.html')) {
-                // Přímé přesměrování na tabulky.html#kit-table
-                window.location.href = href;
-                event.preventDefault();
-            }
-        });
-    });
-
     // Načti overall jako karty s error handlingem
     const loadingIndicator = document.getElementById('loading-indicator');
     const errorMessage = document.getElementById('error-message');
-    
+
     try {
-        await nactiOverallExcel('https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx');
-        // Skryj loading indicator po úspěšném načtení
+        await nactiOverallExcel();
         if (loadingIndicator) loadingIndicator.style.display = 'none';
         const tabulka = document.getElementById('overall-tabulka');
         if (tabulka) tabulka.classList.remove('tabulka-loading');
-        // TierHistory is already processed inside nactiOverallExcel from the same workbook
     } catch (error) {
         console.error('Error loading data:', error);
-        // Zobraz error message
         if (loadingIndicator) loadingIndicator.style.display = 'none';
         if (errorMessage) errorMessage.style.display = 'block';
-    }
-
-    zobrazTabulku('overall-tabulka');
-
-    // Score title based on point range
-    function getScoreTitle(score) {
-        if (score >= 300) return { title: 'Legenda', color: '#FFCF4A' };
-        if (score >= 200) return { title: 'Elita', color: '#A4B3C7' };
-        if (score >= 100) return { title: 'Šampion', color: '#8F5931' };
-        if (score >= 50)  return { title: 'Bojovník', color: '#6366f1' };
-        return { title: 'Nováček', color: '#655B79' };
     }
 
     // Get earliest tier history date for a player (how long on tierlist)
@@ -644,10 +404,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                 <div class="card-header compact-row">
                     <div class="rank-badge" style="background:${rankColor}; color:#23242a;">${rank}</div>
                     <div class="skin-bg rank-${rank}">
-                        <img class="skin" src="https://mc-heads.net/avatar/${player.uuid}/64" alt="${player.nick}" loading="lazy" decoding="async" fetchpriority="${rank <= 3 ? 'high' : 'low'}">
+                        <img class="skin" src="https://mc-heads.net/avatar/${player.uuid}/64" alt="${escapeXml(player.nick)}" loading="lazy" decoding="async" fetchpriority="${rank <= 3 ? 'high' : 'low'}">
                     </div>
                     <div class="player-info">
-                        <div class="player-name">${player.nick}</div>
+                        <div class="player-name">${escapeXml(player.nick)}</div>
                         <div class="score-row">
                             <span class="score score-clickable" title="Zobrazit graf bodů">${player.score}</span>
                             <span class="score-title" style="--st-color:${st.color};">${st.title}</span>
@@ -853,10 +613,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                     <div class="recent-card">
                         ${avatarSrc ? `<img class="recent-avatar" src="${avatarSrc}" alt="" loading="lazy">` : ''}
                         <div class="recent-info">
-                            <span class="recent-nick">${e.nick}</span>
-                            <span class="recent-date">${e.date}</span>
+                            <span class="recent-nick">${escapeXml(e.nick)}</span>
+                            <span class="recent-date">${escapeXml(e.date)}</span>
                         </div>
-                        ${kitIconSrc ? `<img class="recent-kit-icon" src="${kitIconSrc}" alt="${e.kit || ''}" title="${e.kit || ''}">` : ''}
+                        ${kitIconSrc ? `<img class="recent-kit-icon" src="${kitIconSrc}" alt="${escapeXml(e.kit || '')}" title="${escapeXml(e.kit || '')}">` : ''}
                         <span class="recent-badge" style="${badgeStyle}">${info.novyText}</span>
                         ${dirHtml}
                     </div>`;
@@ -882,52 +642,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // ========== TIER JOURNEY ==========
 
-    async function nactiTierHistory(url) {
-        try {
-            const response = await fetch(url);
-            if (!response.ok) return;
-            const data = await response.arrayBuffer();
-            const workbook = XLSX.read(data, { type: 'array' });
-            // Hledá list pojmenovaný 'TierHistory' (vytváří bot)
-            const sheetName = workbook.SheetNames.find(n => n === 'TierHistory');
-            if (!sheetName) return;
-            const worksheet = workbook.Sheets[sheetName];
-            if (!worksheet) return;
-            const rows = XLSX.utils.sheet_to_json(worksheet);
-
-            const iconMap = {
-                'Crystal': 'kit_icons/cpvp.png',
-                'Axe': 'kit_icons/axe.png',
-                'Sword': 'kit_icons/sword.png',
-                'UHC': 'kit_icons/uhc.png',
-                'Npot': 'kit_icons/npot.png', 'NPot': 'kit_icons/npot.png',
-                'Pot': 'kit_icons/pot.png',
-                'SMP': 'kit_icons/smp.png',
-                'DiaSMP': 'kit_icons/diasmp.png',
-                'Mace': 'kit_icons/mace.png'
-            };
-
-            rows.forEach(row => {
-                if (!row.Kit || !row.Tier) return;
-                // Primární klíč: Discord ID (stabilní i při změně nicku)
-                const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : null;
-                if (!discordId) return;
-                const kit     = String(row.Kit).trim();
-                const tier    = String(row.Tier).trim();
-                const date    = row.Date    ? String(row.Date).trim()    : null;
-                const note    = row.Verdict ? String(row.Verdict).trim() : null;
-                const oldTier = row.OldTier ? String(row.OldTier).trim() : null;
-                const icon    = iconMap[kit] || null;
-                if (!icon) return;
-                if (!tierHistory[discordId]) tierHistory[discordId] = {};
-                if (!tierHistory[discordId][icon]) tierHistory[discordId][icon] = [];
-                tierHistory[discordId][icon].push({ tier, date, note, kit, oldTier });
-            });
-        } catch (e) {
-            // History not available – silently skip
-        }
-    }
-
     function getKitNameFromIcon(icon) {
         const map = {
             'kit_icons/cpvp.png':   'Crystal PvP',
@@ -941,23 +655,6 @@ document.addEventListener('DOMContentLoaded', async function () {
             'kit_icons/mace.png':   'Mace'
         };
         return map[icon] || icon;
-    }
-
-    function resolveTierValue(tier) {
-        tier = String(tier).trim();
-        // Handle "LT3 + Evaluation", "LT3 + Eval", "Evaluation" etc.
-        const upper = tier.toUpperCase();
-        if (upper.includes('EVAL')) {
-            return '10'; // LT3
-        }
-        const validNums = ['1','2','3','5','10','16','24','32','48','60','22','29','43','54'];
-        if (validNums.includes(tier)) return tier;
-        const textMap = {
-            'HT1':'60','LT1':'48','HT2':'32','LT2':'24','HT3':'16',
-            'LT3':'10','HT4':'5','LT4':'3','HT5':'2','LT5':'1',
-            'RHT1':'54','RLT1':'43','RHT2':'29','RLT2':'22'
-        };
-        return textMap[upper] || null;
     }
 
     function escapeXml(str) {
@@ -1202,12 +899,18 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Apply card customizations (for any player now)
         if (cardSettings) {
             if (cardSettings.banner) {
-                banner.style.background = cardSettings.banner;
-                banner.style.display = '';
+                const bannerVal = String(cardSettings.banner);
+                if (!/url\s*\(/i.test(bannerVal)) {
+                    banner.style.background = bannerVal;
+                    banner.style.display = '';
+                }
             }
             if (cardSettings.accent) {
-                nameEl.style.color = cardSettings.accent;
-                content.style.borderColor = cardSettings.accent + '33';
+                const accentVal = String(cardSettings.accent).trim();
+                if (/^#[0-9a-f]{3,8}$/i.test(accentVal) || /^rgba?\s*\(/i.test(accentVal)) {
+                    nameEl.style.color = accentVal;
+                    content.style.borderColor = accentVal + '33';
+                }
             }
             if (cardSettings.bio) {
                 bioEl.textContent = cardSettings.bio;
@@ -1215,33 +918,57 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
             if (favkitEl && cardSettings.favoriteKit) {
                 const kitIcon = KIT_NAME_TO_ICON[cardSettings.favoriteKit] || '';
-                const iconHtml = kitIcon ? '<img class="favkit-icon" src="' + kitIcon + '" alt="">' : '';
-                favkitEl.innerHTML = '<span class="favkit-label">Oblíbený kit:</span> ' + iconHtml + '<span class="favkit-value">' + cardSettings.favoriteKit + '</span>';
-                if (cardSettings.accent) {
-                    const fv = favkitEl.querySelector('.favkit-value');
-                    if (fv) fv.style.color = cardSettings.accent;
+                favkitEl.innerHTML = '';
+                const lbl = document.createElement('span');
+                lbl.className = 'favkit-label';
+                lbl.textContent = 'Oblíbený kit:';
+                favkitEl.appendChild(lbl);
+                favkitEl.appendChild(document.createTextNode(' '));
+                if (kitIcon) {
+                    const img = document.createElement('img');
+                    img.className = 'favkit-icon';
+                    img.src = kitIcon;
+                    img.alt = '';
+                    favkitEl.appendChild(img);
                 }
+                const val = document.createElement('span');
+                val.className = 'favkit-value';
+                val.textContent = cardSettings.favoriteKit;
+                const accentVal = String(cardSettings.accent || '').trim();
+                if (accentVal && (/^#[0-9a-f]{3,8}$/i.test(accentVal) || /^rgba?\s*\(/i.test(accentVal))) {
+                    val.style.color = accentVal;
+                }
+                favkitEl.appendChild(val);
                 favkitEl.style.display = '';
             }
             // Apply avatar decoration (image overlay + glow)
             if (decoWrap && cardSettings.decoration) {
-                decoWrap.setAttribute('data-deco', cardSettings.decoration);
-                if (decoOverlay) {
-                    decoOverlay.src = 'decorations/' + cardSettings.decoration + '.png';
-                    decoOverlay.style.display = '';
-                    decoOverlay.onerror = () => { decoOverlay.style.display = 'none'; };
+                const safeDecoName = String(cardSettings.decoration).replace(/[^a-zA-Z0-9_-]/g, '');
+                if (safeDecoName) {
+                    decoWrap.setAttribute('data-deco', safeDecoName);
+                    if (decoOverlay) {
+                        decoOverlay.src = 'decorations/' + safeDecoName + '.png';
+                        decoOverlay.style.display = '';
+                        decoOverlay.onerror = () => { decoOverlay.style.display = 'none'; };
+                    }
                 }
             }
-            // Apply name effect
+            // Apply name effect — whitelist only known values
             if (cardSettings.nameEffect) {
-                nameEl.classList.add('name-effect-' + cardSettings.nameEffect);
-                if (cardSettings.nameEffect === 'gradient' || cardSettings.nameEffect === 'rainbow') {
-                    nameEl.style.color = '';  // Let gradient take over
+                const ALLOWED_EFFECTS = ['gradient', 'rainbow', 'glitch', 'glow', 'typewriter'];
+                if (ALLOWED_EFFECTS.includes(cardSettings.nameEffect)) {
+                    nameEl.classList.add('name-effect-' + cardSettings.nameEffect);
+                    if (cardSettings.nameEffect === 'gradient' || cardSettings.nameEffect === 'rainbow') {
+                        nameEl.style.color = '';
+                    }
                 }
             }
-            // Apply profile theme
+            // Apply profile theme — whitelist only known values
             if (cardSettings.theme) {
-                content.setAttribute('data-theme', cardSettings.theme);
+                const ALLOWED_THEMES = ['neon', 'dark', 'retro', 'minecraft'];
+                if (ALLOWED_THEMES.includes(cardSettings.theme)) {
+                    content.setAttribute('data-theme', cardSettings.theme);
+                }
             }
         }
 

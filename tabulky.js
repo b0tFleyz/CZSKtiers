@@ -1406,35 +1406,60 @@ document.addEventListener('DOMContentLoaded', function () {
         // Apply card settings helper
         function applyCardSettings(cs) {
             if (cs) {
-                if (banner && cs.banner) { banner.style.background = cs.banner; banner.style.display = ''; }
-                else if (banner) { banner.style.display = 'none'; }
-                if (name && cs.accent) { name.style.color = cs.accent; content.style.borderColor = cs.accent + '33'; }
-                else { if (name) name.style.color = ''; if (content) content.style.borderColor = ''; }
+                if (banner && cs.banner) {
+                    const bannerVal = String(cs.banner);
+                    if (!/url\s*\(/i.test(bannerVal)) { banner.style.background = bannerVal; banner.style.display = ''; }
+                    else { banner.style.display = 'none'; }
+                } else if (banner) { banner.style.display = 'none'; }
+                if (name && cs.accent) {
+                    const accentVal = String(cs.accent).trim();
+                    if (/^#[0-9a-f]{3,8}$/i.test(accentVal) || /^rgba?\s*\(/i.test(accentVal)) {
+                        name.style.color = accentVal; content.style.borderColor = accentVal + '33';
+                    }
+                } else { if (name) name.style.color = ''; if (content) content.style.borderColor = ''; }
                 if (bioEl && cs.bio) { bioEl.textContent = cs.bio; bioEl.style.display = ''; }
                 else if (bioEl) { bioEl.style.display = 'none'; }
                 if (favkitEl && cs.favoriteKit) {
-                    favkitEl.innerHTML = '<span class="favkit-label">Oblíbený kit:</span> <span class="favkit-value">' + cs.favoriteKit + '</span>';
+                    favkitEl.innerHTML = '';
+                    const lbl = document.createElement('span');
+                    lbl.className = 'favkit-label';
+                    lbl.textContent = 'Oblíbený kit:';
+                    favkitEl.appendChild(lbl);
+                    favkitEl.appendChild(document.createTextNode(' '));
+                    const val = document.createElement('span');
+                    val.className = 'favkit-value';
+                    val.textContent = cs.favoriteKit;
+                    favkitEl.appendChild(val);
                     favkitEl.style.display = '';
                 } else if (favkitEl) { favkitEl.style.display = 'none'; }
                 // Avatar decoration
                 if (decoWrap && cs.decoration) {
-                    decoWrap.setAttribute('data-deco', cs.decoration);
-                    if (decoOverlay) {
-                        decoOverlay.src = 'decorations/' + cs.decoration + '.png';
-                        decoOverlay.style.display = '';
-                        decoOverlay.onerror = function() { decoOverlay.style.display = 'none'; };
+                    const safeDecoName = String(cs.decoration).replace(/[^a-zA-Z0-9_-]/g, '');
+                    if (safeDecoName) {
+                        decoWrap.setAttribute('data-deco', safeDecoName);
+                        if (decoOverlay) {
+                            decoOverlay.src = 'decorations/' + safeDecoName + '.png';
+                            decoOverlay.style.display = '';
+                            decoOverlay.onerror = function() { decoOverlay.style.display = 'none'; };
+                        }
                     }
                 }
-                // Name effect
+                // Name effect — whitelist only known values
                 if (name && cs.nameEffect) {
-                    name.classList.add('name-effect-' + cs.nameEffect);
-                    if (cs.nameEffect === 'gradient' || cs.nameEffect === 'rainbow') {
-                        name.style.color = '';
+                    const ALLOWED_EFFECTS = ['gradient', 'rainbow', 'glitch', 'glow', 'typewriter'];
+                    if (ALLOWED_EFFECTS.includes(cs.nameEffect)) {
+                        name.classList.add('name-effect-' + cs.nameEffect);
+                        if (cs.nameEffect === 'gradient' || cs.nameEffect === 'rainbow') {
+                            name.style.color = '';
+                        }
                     }
                 }
-                // Profile theme
+                // Profile theme — whitelist only known values
                 if (content && cs.theme) {
-                    content.setAttribute('data-theme', cs.theme);
+                    const ALLOWED_THEMES = ['neon', 'dark', 'retro', 'minecraft'];
+                    if (ALLOWED_THEMES.includes(cs.theme)) {
+                        content.setAttribute('data-theme', cs.theme);
+                    }
                 }
             } else {
                 if (banner) banner.style.display = 'none';

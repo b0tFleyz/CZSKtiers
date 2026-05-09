@@ -9,6 +9,8 @@
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link rel="preconnect" href="https://mc-heads.net">
 	<link rel="preconnect" href="https://docs.google.com">
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap">
+	<link rel="preload" href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTsYd1Hv8XjsdskgT2O-_Otwe3DKxXTXECPE0s4JcPwPPnLMMpknU_-y8EHNBZTtVEQgzicFKcgluSU/pub?output=xlsx" as="fetch" crossorigin>
 	<link rel="stylesheet" href="../style.css">
 </head>
 <body>
@@ -87,6 +89,7 @@
 	</div>
 	<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 	<script src="../js/guild-config.js"></script>
+	<script src="../js/tier-utils.js"></script>
 	<script src="../js/guild-nav.js"></script>
 	<script src="../js/player-count.js"></script>
 	<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -97,6 +100,6 @@
 	<script src="../js/tierjourney.js"></script>
 	<script src="../js/autocomplete.js"></script>
 	<script src="../js/kit-renderer.js"></script>
-	<script src="../js/ogv.js"></script>
+	<script>renderKitPage('ogv', 'OGV');</script>
 </body>
 </html>
