@@ -34,7 +34,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         'UHC':'kit_icons/uhc.png','Npot':'kit_icons/npot.png','Pot':'kit_icons/pot.png',
         'SMP':'kit_icons/smp.png','DiaSMP':'kit_icons/diasmp.png','Mace':'kit_icons/mace.png',
         'Speed':'kit_icons/speed.png','OGV':'kit_icons/OGV.png','Cart':'kit_icons/cart.png',
-        'Creeper':'kit_icons/creeper.png','DiaVanilla':'kit_icons/diavanilla.png'
+        'Creeper':'kit_icons/creeper.png','DiaVanilla':'kit_icons/diavanilla.png',
+        'Trident':'kit_icons/trident.png','Manhunt':'kit_icons/manhunt.png','Elytra':'kit_icons/elytra.png',
+        'Bow':'kit_icons/bow.png','Bed':'kit_icons/bed.png', 'Debuff':'kit_icons/debuff.png'
     };
 
     function getPeakTierTextFromHistory(discordId, kitIcon) {
@@ -58,7 +60,13 @@ document.addEventListener('DOMContentLoaded', async function () {
             'OGV': 'kit_icons/OGV.png',
             'Cart': 'kit_icons/cart.png',
             'Creeper': 'kit_icons/creeper.png',
-            'DiaVanilla': 'kit_icons/diavanilla.png'
+            'DiaVanilla': 'kit_icons/diavanilla.png',
+            'Trident': 'kit_icons/trident.png',
+            'Manhunt': 'kit_icons/manhunt.png',
+            'Elytra': 'kit_icons/elytra.png',
+            'Bow': 'kit_icons/bow.png',
+            'Bed': 'kit_icons/bed.png',
+            'Debuff': 'kit_icons/debuff.png'
         };
         const lookup = nickToDiscordId || {};
         const rows = XLSX.utils.sheet_to_json(worksheet);
@@ -104,7 +112,13 @@ document.addEventListener('DOMContentLoaded', async function () {
         { key: "OGV", icon: "kit_icons/OGV.png" },
         { key: "Cart", icon: "kit_icons/cart.png" },
         { key: "Creeper", icon: "kit_icons/creeper.png" },
-        { key: "DiaVanilla", icon: "kit_icons/diavanilla.png" }
+        { key: "DiaVanilla", icon: "kit_icons/diavanilla.png" },
+        { key: "Trident", icon: "kit_icons/trident.png" },
+        { key: "Manhunt", icon: "kit_icons/manhunt.png" },
+        { key: "Elytra", icon: "kit_icons/elytra.png" },
+        { key: "Bow", icon: "kit_icons/bow.png" },
+        { key: "Bed", icon: "kit_icons/bed.png" },
+        { key: "Debuff", icon: "kit_icons/debuff.png" }
     ];
     const kits = (_guild === 'subtiers') ? SUB_KITS : CZSK_KITS;
 
