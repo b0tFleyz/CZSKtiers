@@ -1,0 +1,1 @@
+renderKitPage('elytra', 'Elytra');

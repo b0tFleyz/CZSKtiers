@@ -28,12 +28,18 @@ const GUILD_CONFIG = {
     sheetTab: 'SubTiers',
     tierHistoryTab: 'SubTiersTierHistory',
     discord: 'https://discord.gg/B2nuJsFcqK',
-    kits: [
+        kits: [
       { key: 'Speed',      slug: 'speed',      icon: 'speed.png',      label: 'Speed' },
       { key: 'OGV',        slug: 'ogv',        icon: 'OGV.png',        label: 'OGV' },
       { key: 'Cart',       slug: 'cart',       icon: 'cart.png',       label: 'Cart' },
       { key: 'Creeper',    slug: 'creeper',    icon: 'creeper.png',    label: 'Creeper' },
-      { key: 'DiaVanilla', slug: 'diavanilla', icon: 'diavanilla.png', label: 'DiaVanilla' }
+      { key: 'DiaVanilla', slug: 'diavanilla', icon: 'diavanilla.png', label: 'DiaVanilla' },
+      { key: 'Trident',    slug: 'trident',    icon: 'trident.png',    label: 'Trident' },
+      { key: 'Manhunt',    slug: 'manhunt',    icon: 'manhunt.png',    label: 'Manhunt' },
+      { key: 'Elytra',     slug: 'elytra',     icon: 'elytra.png',     label: 'Elytra' },
+      { key: 'Bow',        slug: 'bow',        icon: 'bow.png',        label: 'Bow' },
+      { key: 'Bed',        slug: 'bed',        icon: 'bed.png',        label: 'Bed' },
+      { key: 'Debuff',     slug: 'debuff',     icon: 'debuff.png',     label: 'Debuff' }
     ]
   }
 };

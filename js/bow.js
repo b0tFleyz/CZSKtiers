@@ -1,0 +1,1 @@
+renderKitPage('bow', 'Bow');
