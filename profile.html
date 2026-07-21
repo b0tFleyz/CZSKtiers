@@ -305,7 +305,7 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -837,29 +837,64 @@
         }
 
         // Save
+        // firebase.auth().currentUser je po načtení stránky chvíli null, než se
+        // relace obnoví ze storage. Bez čekání by se zápis u přihlášeného hráče
+        // tiše přeskočil, kdyby klikl na Uložit moc brzy.
+        function getFirebaseUser() {
+            return new Promise(function (resolve) {
+                if (firebase.auth().currentUser) return resolve(firebase.auth().currentUser);
+                var done = false;
+                var unsub = firebase.auth().onAuthStateChanged(function (u) {
+                    if (done) return;
+                    done = true;
+                    if (unsub) unsub();
+                    resolve(u);
+                });
+                // Pojistka, ať se na rozbitém spojení nečeká donekonečna.
+                setTimeout(function () {
+                    if (done) return;
+                    done = true;
+                    if (unsub) unsub();
+                    resolve(firebase.auth().currentUser || null);
+                }, 5000);
+            });
+        }
+
+        var savedPublicly = true;
         document.getElementById('save-btn').addEventListener('click', async function() {
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+            savedPublicly = true;
             // Also save to Firestore for public visibility
             try {
-                // Ensure Firebase Auth is active (needed for Firestore rules)
-                if (!firebase.auth().currentUser) {
-                    await firebase.auth().signInAnonymously();
+                // Zápis vyžaduje přihlášení POD VLASTNÍM účtem.
+                // Dřív se tu volalo signInAnonymously() — Firestore pravidla pak
+                // nemohla nijak ověřit, že karta patří přihlášenému hráči, takže
+                // kdokoli mohl přepsat cizí profil. Anonymní zápis je zrušen.
+                var fbUser = await getFirebaseUser();
+                if (!fbUser) {
+                    savedPublicly = false;
+                    console.warn('Firestore: karta uložena jen lokálně — nejsi přihlášen přes Firebase.');
+                } else {
+                    var db = firebase.firestore();
+                    // Ořež délky, ať se do dokumentu nedá uložit obří blob.
+                    var clip = function (v, n) { return String(v || '').slice(0, n); };
+                    await db.collection('cardSettings').doc(nick.toLowerCase()).set({
+                        banner: clip(settings.banner, 200),
+                        accent: clip(settings.accent, 32),
+                        bio: clip(settings.bio, 300),
+                        favoriteKit: clip(settings.favoriteKit, 40),
+                        decoration: clip(settings.decoration, 40),
+                        nameEffect: clip(settings.nameEffect, 40),
+                        theme: clip(settings.theme, 40)
+                    });
                 }
-                var db = firebase.firestore();
-                await db.collection('cardSettings').doc(nick.toLowerCase()).set({
-                    banner: settings.banner || '',
-                    accent: settings.accent || '',
-                    bio: settings.bio || '',
-                    favoriteKit: settings.favoriteKit || '',
-                    decoration: settings.decoration || '',
-                    nameEffect: settings.nameEffect || '',
-                    theme: settings.theme || ''
-                });
-            } catch(e) { console.warn('Firestore save:', e); }
+            } catch(e) { savedPublicly = false; console.warn('Firestore save:', e); }
             var msg = document.getElementById('save-msg');
-            msg.textContent = '✓ Uloženo!';
-            msg.className = 'save-msg show success';
-            setTimeout(function() { msg.className = 'save-msg'; }, 2000);
+            // Neříkej "Uloženo!", když se karta nedostala do Firestore —
+            // hráč by si myslel, že ji vidí ostatní, a ona by byla jen u něj.
+            msg.textContent = savedPublicly ? '✓ Uloženo!' : '⚠ Uloženo jen lokálně — přihlas se znovu';
+            msg.className = 'save-msg show ' + (savedPublicly ? 'success' : '');
+            setTimeout(function() { msg.className = 'save-msg'; }, savedPublicly ? 2000 : 4000);
         });
 
         buildCustomize();
