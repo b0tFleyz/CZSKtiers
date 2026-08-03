@@ -308,6 +308,37 @@ document.addEventListener('DOMContentLoaded', async function () {
         return earliest === Infinity ? null : earliest;
     }
 
+    // Single source of truth for the kit-badge markup shown on cards and in the
+    // player modal. Expects tier objects already filtered + sorted by the caller.
+    function buildKitBadgesHtml(sortedTiers) {
+        return sortedTiers.map(t => {
+            const info = tierInfo(String(t.tier));
+            const origText = getOriginalTierText(String(t.tier));
+            let style, circleColor;
+            if (origText.startsWith("R")) {
+                style = `background:#23242a;color:${info.barvaTextu};`;
+                circleColor = "#23242a";
+            } else {
+                style = `background:${info.barvaPozadi};color:#23242a;`;
+                circleColor = info.barvaPozadi;
+            }
+            return `
+                    <span class="kit-badge tooltip" data-kit-icon="${t.icon}" style="--tier-color:${origText.startsWith('R') ? info.barvaTextu : info.barvaPozadi};">
+                        <span class="kit-icon-circle" style="border-color:${circleColor};">
+                            <img src="${t.icon}" alt="" class="kit-icon" loading="lazy">
+                        </span>
+                        <span class="kit-tier-text" style="${style}">
+                            ${info.novyText}
+                        </span>
+                        <span class="tooltiptext">
+                            <strong>${origText}</strong><br>
+                            ${t.peakTierText ? PEAK_TIER_SCORE[t.peakTierText] : t.tier} pts${t.peakTierText ? `<br><span style="font-size:0.85em;opacity:0.7;">Peak: ${t.peakTierText}</span>` : ''}
+                        </span>
+                    </span>
+                `;
+        }).join('');
+    }
+
     function renderOverall(overallData) {
         const container = document.getElementById('overall-tabulka');
         if (!container) return;
@@ -365,33 +396,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                     return getTierOrder(aVal) - getTierOrder(bVal);
                 });
 
-            const kitsHtml = sortedTiers.map(t => {
-                const info = tierInfo(String(t.tier));
-                const origText = getOriginalTierText(String(t.tier));
-                let style = "";
-                let circleColor = "";
-                if (origText.startsWith("R")) {
-                    style = `background:#23242a;color:${info.barvaTextu};`;
-                    circleColor = "#23242a";
-                } else {
-                    style = `background:${info.barvaPozadi};color:#23242a;`;
-                    circleColor = info.barvaPozadi;
-                }
-                return `
-                    <span class="kit-badge tooltip" data-kit-icon="${t.icon}" style="--tier-color:${origText.startsWith('R') ? info.barvaTextu : info.barvaPozadi};">
-                        <span class="kit-icon-circle" style="border-color:${circleColor};">
-                            <img src="${t.icon}" alt="" class="kit-icon" loading="lazy">
-                        </span>
-                        <span class="kit-tier-text" style="${style}">
-                            ${info.novyText}
-                        </span>
-                        <span class="tooltiptext">
-                            <strong>${origText}</strong><br>
-                            ${t.peakTierText ? PEAK_TIER_SCORE[t.peakTierText] : t.tier} pts${t.peakTierText ? `<br><span style="font-size:0.85em;opacity:0.7;">Peak: ${t.peakTierText}</span>` : ''}
-                        </span>
-                    </span>
-                `;
-            }).join('');
+            const kitsHtml = buildKitBadgesHtml(sortedTiers);
 
             playerCards.push({
                 rank,
@@ -807,17 +812,26 @@ document.addEventListener('DOMContentLoaded', async function () {
                 // Position the tooltip
                 const svgRect  = svgEl.getBoundingClientRect();
                 const wrapRect = container.getBoundingClientRect();
-                const total    = history.length;
-                const ptIndex  = parseFloat(this.getAttribute('cx')) === 0 ? 0 : i;
-                const cx       = parseFloat(this.getAttribute('cx'));
-                const cy       = parseFloat(this.getAttribute('cy'));
-                const scaleX   = svgRect.width  / SVG_W;
-                const scaleY   = svgRect.height / SVG_H;
-                const tipX     = (svgRect.left - wrapRect.left) + cx * scaleX;
-                const tipY     = (svgRect.top  - wrapRect.top)  + cy * scaleY;
+                const cx = parseFloat(this.getAttribute('cx'));
+                const cy = parseFloat(this.getAttribute('cy'));
+                const tipX = (svgRect.left - wrapRect.left) + cx * (svgRect.width  / SVG_W);
+                const tipY = (svgRect.top  - wrapRect.top)  + cy * (svgRect.height / SVG_H);
+                const tipW = tip.offsetWidth;
+                const tipH = tip.offsetHeight;
+                const GAP  = 18;
 
-                tip.style.left = (tipX - tip.offsetWidth / 2) + 'px';
-                tip.style.top  = (tipY - tip.offsetHeight - 18) + 'px';
+                // Prefer above the point, but flip below it when there isn't room
+                // (points near the top row — HT1/LT1 — would otherwise push the
+                // tooltip up over the tier labels)
+                let top = tipY - tipH - GAP;
+                if (top < 4) top = tipY + GAP;
+
+                // Keep the tooltip from overflowing the left/right edges of the chart
+                let left = tipX - tipW / 2;
+                left = Math.max(4, Math.min(left, wrapRect.width - tipW - 4));
+
+                tip.style.left = left + 'px';
+                tip.style.top  = top + 'px';
             });
             circle.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
         });
@@ -1314,55 +1328,14 @@ document.addEventListener('DOMContentLoaded', async function () {
                     const player = allPlayers.find(p => p.nick === nick);
                     if (player) {
                         // Najdi pozici hráče v seřazeném seznamu
-                        const sortedPlayers = [...allPlayers].sort((a, b) => b.score - a.score);
-                        let lastScore = null;
-                        let lastRank = 0;
-                        let position = 1;
-                        
-                        for (let i = 0; i < sortedPlayers.length; i++) {
-                            const p = sortedPlayers[i];
-                            const currentRank = (p.score === lastScore) ? lastRank : (i + 1);
-                            const isMatch = (player.discordId && p.discordId === player.discordId) || p.nick === player.nick;
-                            if (isMatch) {
-                                position = currentRank;
-                                break;
-                            }
-                            lastScore = p.score;
-                            lastRank = currentRank;
-                        }
-                        
+                        const position = getPositionMap().get(player.nick) || 1;
+
                         // Vygeneruj kits HTML pro modal
                         const sortedTiers = (player.tiers || [])
                             .filter(t => t.tier && t.tier !== "-")
                             .sort((a, b) => getTierOrder(a.tier) - getTierOrder(b.tier));
                         
-                        const kitsHtml = sortedTiers.map(t => {
-                            const info = tierInfo(String(t.tier));
-                            const origText = getOriginalTierText(String(t.tier));
-                            let style = "";
-                            let circleColor = "";
-                            if (origText.startsWith("R")) {
-                                style = "background:#23242a;color:" + info.barvaTextu + ";";
-                                circleColor = "#23242a";
-                            } else {
-                                style = "background:" + info.barvaPozadi + ";color:#23242a;";
-                                circleColor = info.barvaPozadi;
-                            }
-                            const ptsDisplay = t.peakTierText ? PEAK_TIER_SCORE[t.peakTierText] : t.tier;
-                            const peakExtra = t.peakTierText ? '<br><span style="font-size:0.85em;opacity:0.7;">Peak: ' + t.peakTierText + '</span>' : '';
-                            return '<span class="kit-badge tooltip" data-kit-icon="' + t.icon + '" style="--tier-color:' + (origText.startsWith('R') ? info.barvaTextu : info.barvaPozadi) + ';">' +
-                                '<span class="kit-icon-circle" style="border-color:' + circleColor + ';">' +
-                                '<img src="' + t.icon + '" alt="" class="kit-icon" loading="lazy">' +
-                                '</span>' +
-                                '<span class="kit-tier-text" style="' + style + '">' +
-                                info.novyText +
-                                '</span>' +
-                                '<span class="tooltiptext">' +
-                                '<strong>' + origText + '</strong><br>' +
-                                ptsDisplay + ' pts' + peakExtra +
-                                '</span>' +
-                                '</span>';
-                        }).join('');
+                        const kitsHtml = buildKitBadgesHtml(sortedTiers);
                         
                         showPlayerModal({
                             name: player.nick,
@@ -1382,8 +1355,14 @@ document.addEventListener('DOMContentLoaded', async function () {
                     }
                 });
             });
+        });
 
-            
+        // Keyboard navigation (arrow keys / Enter / Escape).
+        // NOTE: this must be a separate `keydown` listener — it previously lived
+        // inside the `input` handler above, where `e.key` is always undefined,
+        // so keyboard navigation silently did nothing.
+        searchInput.addEventListener('keydown', function(e) {
+            const suggestions = suggestionsDiv.querySelectorAll('.search-suggestion-item');
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 currentSuggestionIndex = Math.min(currentSuggestionIndex + 1, suggestions.length - 1);
@@ -1435,16 +1414,29 @@ document.addEventListener('DOMContentLoaded', async function () {
     // ========== PLAYER COMPARISON ==========
     let comparePlayerA = null; // stored from player modal
 
-    function getPlayerPosition(nick) {
+    // Dense-rank lookup (nick -> rank, ties share a rank), cached by the identity of
+    // allPlayers so repeated clicks (autocomplete select, compare, etc.) don't each
+    // re-sort the full player list. allPlayers is only ever reassigned (not mutated
+    // in place, e.g. on Time Machine toggle), so a reference check is enough to
+    // detect staleness.
+    let _positionMapCache = { forArray: null, map: null };
+    function getPositionMap() {
+        if (_positionMapCache.forArray === allPlayers) return _positionMapCache.map;
         const sorted = [...allPlayers].sort((a, b) => b.score - a.score);
+        const map = new Map();
         let lastScore = null, lastRank = 0;
         for (let i = 0; i < sorted.length; i++) {
             const rank = (sorted[i].score === lastScore) ? lastRank : (i + 1);
-            if (sorted[i].nick === nick) return rank;
+            map.set(sorted[i].nick, rank);
             lastScore = sorted[i].score;
             lastRank = rank;
         }
-        return null;
+        _positionMapCache = { forArray: allPlayers, map };
+        return map;
+    }
+
+    function getPlayerPosition(nick) {
+        return getPositionMap().get(nick) || null;
     }
 
     // ========== SCORE GRAPH ==========
@@ -2135,16 +2127,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         let picker = document.getElementById('compare-picker');
         if (picker) picker.remove();
 
-        // Pre-compute positions once (avoid sorting per-item)
-        const positionMap = {};
-        const sorted = [...allPlayers].sort((a, b) => b.score - a.score);
-        let lastScore = null, lastRank = 0;
-        sorted.forEach((p, i) => {
-            const rank = (p.score === lastScore) ? lastRank : (i + 1);
-            positionMap[p.nick] = rank;
-            lastScore = p.score;
-            lastRank = rank;
-        });
+        // Positions come from the shared cache (avoids yet another full sort here)
+        const positionMap = getPositionMap();
 
         picker = document.createElement('div');
         picker.id = 'compare-picker';
@@ -2174,7 +2158,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         function buildSuggestionHTML(matches) {
             return matches.map((p, idx) => {
-                const pos = positionMap[p.nick] || '?';
+                const pos = positionMap.get(p.nick) || '?';
                 const st = getScoreTitle(p.score);
                 return `<div class="compare-picker-item" data-idx="${idx}">
                     <img src="https://mc-heads.net/avatar/${p.uuid || p.nick}/32" alt="" loading="lazy">

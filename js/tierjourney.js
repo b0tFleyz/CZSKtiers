@@ -208,8 +208,22 @@
                 const cy = parseFloat(this.getAttribute('cy'));
                 const tipX = (svgRect.left - wrapRect.left) + cx * (svgRect.width  / SVG_W);
                 const tipY = (svgRect.top  - wrapRect.top)  + cy * (svgRect.height / SVG_H);
-                tip.style.left = (tipX - tip.offsetWidth / 2) + 'px';
-                tip.style.top  = (tipY - tip.offsetHeight - 18) + 'px';
+                const tipW = tip.offsetWidth;
+                const tipH = tip.offsetHeight;
+                const GAP  = 18;
+
+                // Prefer above the point, but flip below it when there isn't room
+                // (points near the top row — HT1/LT1 — would otherwise push the
+                // tooltip up over the tier labels)
+                let top = tipY - tipH - GAP;
+                if (top < 4) top = tipY + GAP;
+
+                // Keep the tooltip from overflowing the left/right edges of the chart
+                let left = tipX - tipW / 2;
+                left = Math.max(4, Math.min(left, wrapRect.width - tipW - 4));
+
+                tip.style.left = left + 'px';
+                tip.style.top  = top + 'px';
             });
             circle.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
         });

@@ -136,6 +136,12 @@ body {
 .header-player-count {
     display: flex;
     align-items: center;
+    justify-content: flex-start;  /* lock the count badge to the left edge */
+    /* Pin it near the start of the header regardless of DOM insertion order —
+       player-count.js appends this element wherever .main-header happens to be
+       in its lifecycle when the script runs, which differs page to page and
+       otherwise lets it drift to the right on kit pages. */
+    order: -1;
 }
 
 .player-count-badge {
@@ -235,7 +241,12 @@ body {
     color: #a5b4ff;
     transform: translateY(-1px);
 }
-.discord-icon { width: 20px; height: 20px; }
+.discord-icon {
+    height: 20px;
+    width: auto;            /* preserve the source 2000×1512 (~1.32:1) ratio — no squish */
+    object-fit: contain;    /* stay undistorted even if the asset ratio changes */
+    flex: 0 0 auto;         /* don't let the flex row shrink/stretch it */
+}
 
 /* Time Machine */
 .time-machine-wrap { position: relative; }
@@ -504,6 +515,7 @@ nav ul li { flex-shrink: 0; }
     padding: 3px;
     flex-shrink: 0;
     overflow: hidden;
+    order: -2; /* stays leftmost; player-count (order: -1) sits right after it */
 }
 .guild-toggle-btn {
     position: relative; z-index: 1;
@@ -613,7 +625,7 @@ nav ul li { flex-shrink: 0; }
 }
 .recent-cards {
     display: flex; gap: 8px;
-    overflow-x: auto; padding-bottom: 4px;
+    overflow-x: auto; padding: 8px 0 4px;
     scrollbar-width: none;
 }
 .recent-cards::-webkit-scrollbar { display: none; }
@@ -849,7 +861,7 @@ nav ul li { flex-shrink: 0; }
     display: flex !important;
     flex-direction: row !important;
     gap: 14px;
-    width: 100%;
+    width: 100% !important;
     overflow-x: auto;
     overflow-y: visible;
     scroll-behavior: smooth;
@@ -857,6 +869,17 @@ nav ul li { flex-shrink: 0; }
     scrollbar-color: var(--bg-elevated) transparent;
     padding-bottom: 10px;
     align-items: flex-start;
+    /* Center the columns when they fit; `safe` falls back to flex-start on overflow so the
+       leading columns never get clipped/unreachable in the horizontal scroll area.
+       The plain `center` line is a fallback for browsers that don't understand the
+       `safe` keyword — without it, the whole declaration is invalid and the browser
+       silently defaults to left-aligned columns instead.
+       Both are !important: display/flex-direction above are already !important, which
+       means the JS that builds this element likely sets inline styles on it (e.g. for
+       scroll-width math) — an inline style beats a plain external rule, so width and
+       justify-content need the same treatment or they'll get silently overridden. */
+    justify-content: center !important;
+    justify-content: safe center !important;
 }
 .kit-columns::-webkit-scrollbar { height: 4px; }
 .kit-columns::-webkit-scrollbar-track { background: transparent; }
@@ -970,8 +993,26 @@ nav ul li { flex-shrink: 0; }
 }
 
 /* LT players within a tier column (subtle de-emphasis vs HT) */
-.kit-player-lt { opacity: 0.82; }
+.kit-player-lt {
+    background: rgba(255,255,255,0.03);
+    opacity: 0.82;
+}
 .kit-player-lt:hover { opacity: 1; }
+
+/* Tint the LT background with the column's own tier colour instead of plain
+   white, so it reads as "same tier, lower half" rather than just dimmed */
+.kit-tier-col[data-tier="Tier 1"] .kit-player-lt { background: rgba(var(--tier-1-lt-rgb), 0.06); }
+.kit-tier-col[data-tier="Tier 2"] .kit-player-lt { background: rgba(var(--tier-2-lt-rgb), 0.07); }
+.kit-tier-col[data-tier="Tier 3"] .kit-player-lt { background: rgba(var(--tier-3-lt-rgb), 0.07); }
+.kit-tier-col[data-tier="Tier 4"] .kit-player-lt,
+.kit-tier-col[data-tier="Tier 5"] .kit-player-lt { background: rgba(var(--tier-45-rgb), 0.08); }
+
+/* Thin divider where the HT group ends and the LT group begins */
+.kit-player:not(.kit-player-lt) + .kit-player-lt {
+    margin-top: 7px;
+    padding-top: 11px;
+    border-top: 1px dashed var(--border-subtle);
+}
 
 /* Retired */
 .kit-player-retired { opacity: 0.48; }
@@ -1902,3 +1943,189 @@ section { padding: 24px; text-align: center; }
 
 /* Touch scroll for kit columns */
 .kit-columns { -webkit-overflow-scrolling: touch; scroll-snap-type: x mandatory; }
+
+/* ================================================================
+   PREMIUM POLISH — visual upgrade pass
+   Purely additive: new tokens + new/enhanced rules layered on top of
+   the existing design system. Nothing above this point is renamed or
+   removed, so every class/ID the JS relies on keeps working exactly
+   as before.
+   ================================================================ */
+
+:root {
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-smooth:   cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ---------------------------------------------------------------
+   Selection & focus — small details that read as "cared about"
+   --------------------------------------------------------------- */
+::selection { background: rgba(var(--accent-rgb), 0.32); color: #fff; }
+
+a:focus-visible, button:focus-visible, input:focus-visible,
+.nav-btn:focus-visible, .kit-player:focus-visible, .player-card:focus-visible,
+.kit-badge:focus-visible, .search-suggestion-item:focus-visible,
+.guild-toggle-btn:focus-visible, .kit-switcher button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+}
+
+/* ---------------------------------------------------------------
+   Global scrollbar theming — the default OS scrollbar was the one
+   remaining un-themed surface on the page
+   --------------------------------------------------------------- */
+html { scrollbar-color: var(--bg-elevated) var(--bg-deep); scrollbar-width: thin; }
+body::-webkit-scrollbar { width: 10px; }
+body::-webkit-scrollbar-track { background: var(--bg-deep); }
+body::-webkit-scrollbar-thumb { background: var(--bg-elevated); border-radius: 6px; border: 2px solid var(--bg-deep); }
+body::-webkit-scrollbar-thumb:hover { background: var(--bg-surface); }
+
+/* ---------------------------------------------------------------
+   Ambient depth — a very subtle film-grain layer over the existing
+   radial-gradient background. Pure CSS/SVG, no image asset, and it
+   sits on a fixed pseudo-element so it never affects layout or
+   competes with the body's own background-image declaration.
+   --------------------------------------------------------------- */
+body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.03;
+    mix-blend-mode: overlay;
+}
+
+/* ---------------------------------------------------------------
+   Header — subtle ambient glow band + tighter link/button motion
+   --------------------------------------------------------------- */
+.main-header {
+    overflow: visible;
+}
+.main-header::before {
+    content: '';
+    position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
+    width: 560px; height: 140px;
+    background: radial-gradient(ellipse at center, rgba(var(--accent-rgb), 0.10) 0%, transparent 70%);
+    pointer-events: none; z-index: -1;
+}
+
+.discord-link, .time-machine-btn, .nav-btn, .kit-switcher button,
+.retry-btn, .tm-apply, .tm-reset, .load-more-btn, .compare-btn,
+.retired-toggle-btn, .rh-zoom-btn {
+    transition: all 0.2s var(--ease-smooth);
+}
+.discord-link:active, .time-machine-btn:active, .retry-btn:active,
+.tm-apply:active, .load-more-btn:active, .compare-btn:active,
+.retired-toggle-btn:active, .save-btn:active, .form-submit:active {
+    transform: scale(0.96);
+}
+
+/* Nav active pill gets a touch more presence */
+.nav-btn.active {
+    transition: all 0.25s var(--ease-spring);
+}
+
+/* ---------------------------------------------------------------
+   Player cards — smoother motion + top-3 ambient treatment.
+   Targets the exact `.skin-bg.rank-1/2/3` classes script.js already
+   emits (`<div class="skin-bg rank-${rank}">`) via :has(), so no JS
+   changes are needed. Browsers without :has() support simply keep
+   the existing (already good) card styling — pure progressive
+   enhancement, nothing breaks.
+   --------------------------------------------------------------- */
+.player-card {
+    transition: border-color 0.25s var(--ease-smooth),
+                box-shadow 0.25s var(--ease-smooth),
+                background 0.25s var(--ease-smooth),
+                transform 0.25s var(--ease-smooth);
+}
+.player-card:hover { transform: translateY(-2px); }
+.player-card:active { transform: translateY(-1px) scale(0.995); }
+
+@supports selector(:has(*)) {
+    .player-card:has(.skin-bg.rank-1) {
+        background: linear-gradient(135deg, rgba(255,207,74,0.07) 0%, var(--bg-card) 45%);
+        border-color: rgba(255,207,74,0.28);
+        box-shadow: 0 4px 32px rgba(255,207,74,0.10), 0 0 0 1px rgba(255,207,74,0.10);
+    }
+    .player-card:has(.skin-bg.rank-1):hover {
+        box-shadow: 0 8px 40px rgba(255,207,74,0.18), 0 0 0 1px rgba(255,207,74,0.20);
+    }
+    .player-card:has(.skin-bg.rank-2) {
+        background: linear-gradient(135deg, rgba(164,179,199,0.06) 0%, var(--bg-card) 45%);
+        border-color: rgba(164,179,199,0.22);
+    }
+    .player-card:has(.skin-bg.rank-2):hover {
+        box-shadow: 0 8px 36px rgba(164,179,199,0.14), 0 0 0 1px rgba(164,179,199,0.16);
+    }
+    .player-card:has(.skin-bg.rank-3) {
+        background: linear-gradient(135deg, rgba(181,99,38,0.06) 0%, var(--bg-card) 45%);
+        border-color: rgba(181,99,38,0.22);
+    }
+    .player-card:has(.skin-bg.rank-3):hover {
+        box-shadow: 0 8px 36px rgba(181,99,38,0.14), 0 0 0 1px rgba(181,99,38,0.16);
+    }
+    /* Rank badge for #1 gets a slow, subtle breathing glow */
+    .player-card:has(.skin-bg.rank-1) .rank-badge {
+        animation: rankOneBreathe 3s ease-in-out infinite;
+    }
+}
+@keyframes rankOneBreathe {
+    0%, 100% { box-shadow: 0 0 18px rgba(255,207,74,0.38); }
+    50%      { box-shadow: 0 0 28px rgba(255,207,74,0.62); }
+}
+
+/* Kit badges get a touch more spring on hover */
+.kit-badge:hover { transition: transform 0.18s var(--ease-spring); }
+
+/* ---------------------------------------------------------------
+   Loading spinner — a slightly richer dual-ring take on the same
+   footprint, still pure CSS, no markup changes required.
+   --------------------------------------------------------------- */
+.spinner, .modal-loader-spinner, .rh-spinner, .profile-loader-spinner {
+    position: relative;
+}
+.spinner::after, .modal-loader-spinner::after, .rh-spinner::after, .profile-loader-spinner::after {
+    content: '';
+    position: absolute; inset: -6px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    border-bottom-color: rgba(var(--accent-rgb), 0.25);
+    animation: spin 1.4s linear infinite reverse;
+}
+
+/* ---------------------------------------------------------------
+   Modal polish — slightly smoother entrance curve
+   --------------------------------------------------------------- */
+.player-modal-content {
+    animation: modalContentIn 0.35s var(--ease-out-expo) 0.06s both;
+}
+.player-modal-close, .rank-history-close, .tier-journey-close,
+.compare-modal-close, .score-graph-close, .compare-picker-close {
+    transition: all 0.2s var(--ease-spring);
+}
+.player-modal-close:hover, .rank-history-close:hover, .tier-journey-close:hover,
+.compare-modal-close:hover, .score-graph-close:hover, .compare-picker-close:hover {
+    transform: rotate(90deg);
+}
+
+/* ---------------------------------------------------------------
+   Recent-card & kit-tier-col: a touch more lift on hover to match
+   the player-card treatment above
+   --------------------------------------------------------------- */
+.recent-card { transition: border-color 0.2s var(--ease-smooth), transform 0.2s var(--ease-smooth), box-shadow 0.2s var(--ease-smooth); }
+.recent-card:hover { box-shadow: var(--shadow-sm); }
+
+.kit-tier-col { transition: box-shadow 0.25s var(--ease-smooth), transform 0.25s var(--ease-smooth); }
+.kit-tier-col:hover { transform: translateY(-2px); }
+
+/* ---------------------------------------------------------------
+   Reduced motion — extend the existing global rule to the new
+   animations introduced above (breathing glow, spinner ring)
+   --------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    .player-card:has(.skin-bg.rank-1) .rank-badge { animation: none; }
+    .spinner::after, .modal-loader-spinner::after, .rh-spinner::after, .profile-loader-spinner::after { animation: none; }
+    .player-card:hover, .player-card:active, .kit-tier-col:hover { transform: none; }
+}
