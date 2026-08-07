@@ -2121,6 +2121,69 @@ body::before {
 .kit-tier-col:hover { transform: translateY(-2px); }
 
 /* ---------------------------------------------------------------
+   TOP-3 PODIUM
+   Pulls the first three leaderboard rows out of the vertical stack
+   into a side-by-side podium — silver / gold / bronze, gold raised
+   in the middle — reusing the same tier-1/2/3 color tokens the
+   rank-1/2/3 :has() treatment above already uses. Pure CSS, driven
+   by nth-child position, so it relies on the same "first three
+   cards = rank 1-3" assumption that treatment already makes.
+   Below 720px there's no room for three columns, so it falls back
+   to the normal single-column list (still gets the :has() tint).
+   --------------------------------------------------------------- */
+@media (min-width: 720px) {
+    #overall-tabulka {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        align-items: end;
+        gap: 16px;
+    }
+    #overall-tabulka > .player-card { grid-column: 1 / -1; }
+
+    #overall-tabulka > .player-card:nth-child(-n+3) {
+        grid-row: 1;
+        display: flex; flex-direction: column; align-items: center; text-align: center;
+        padding: 26px 16px 20px;
+    }
+    #overall-tabulka > .player-card:nth-child(-n+3) .card-header,
+    #overall-tabulka > .player-card:nth-child(-n+3) .compact-row { flex-direction: column; gap: 10px; }
+    #overall-tabulka > .player-card:nth-child(-n+3) .player-info { align-items: center; min-width: 0; }
+    #overall-tabulka > .player-card:nth-child(-n+3) .score-row,
+    #overall-tabulka > .player-card:nth-child(-n+3) .kits-row { justify-content: center; }
+    #overall-tabulka > .player-card:nth-child(-n+3) .skin { width: 84px; height: 84px; }
+    #overall-tabulka > .player-card:nth-child(-n+3) .rank-badge { font-size: 1.3em; }
+
+    /* Silver – Gold – Bronze, left to right, gold riser in the middle */
+    #overall-tabulka > .player-card:nth-child(2) { grid-column: 1; margin-top: 26px; }
+    #overall-tabulka > .player-card:nth-child(1) { grid-column: 2; margin-top: -18px; z-index: 2; }
+    #overall-tabulka > .player-card:nth-child(3) { grid-column: 3; margin-top: 26px; }
+
+    #overall-tabulka > .player-card:nth-child(2) {
+        background: linear-gradient(180deg, rgba(var(--tier-2-rgb),0.16) 0%, var(--bg-card) 70%);
+        border-color: rgba(var(--tier-2-rgb),0.4);
+        box-shadow: 0 8px 32px rgba(var(--tier-2-rgb),0.14), var(--shadow-md);
+    }
+    #overall-tabulka > .player-card:nth-child(3) {
+        background: linear-gradient(180deg, rgba(var(--tier-3-lt-rgb),0.16) 0%, var(--bg-card) 70%);
+        border-color: rgba(var(--tier-3-lt-rgb),0.4);
+        box-shadow: 0 8px 32px rgba(var(--tier-3-lt-rgb),0.14), var(--shadow-md);
+    }
+    #overall-tabulka > .player-card:nth-child(1) {
+        background: linear-gradient(180deg, rgba(var(--tier-1-rgb),0.20) 0%, var(--bg-card) 72%);
+        border-color: rgba(var(--tier-1-rgb),0.5);
+        box-shadow: 0 12px 48px rgba(var(--tier-1-rgb),0.24), var(--shadow-lg);
+        animation: podiumGoldGlow 3s ease-in-out infinite;
+    }
+    #overall-tabulka > .player-card:nth-child(1) .skin { width: 104px; height: 104px; border-width: 3px; }
+    #overall-tabulka > .player-card:nth-child(1) .rank-badge { font-size: 1.5em; }
+
+    @keyframes podiumGoldGlow {
+        0%, 100% { box-shadow: 0 12px 48px rgba(var(--tier-1-rgb),0.22), var(--shadow-lg); }
+        50%      { box-shadow: 0 12px 64px rgba(var(--tier-1-rgb),0.4), var(--shadow-lg); }
+    }
+}
+
+/* ---------------------------------------------------------------
    Reduced motion — extend the existing global rule to the new
    animations introduced above (breathing glow, spinner ring)
    --------------------------------------------------------------- */
@@ -2128,4 +2191,6 @@ body::before {
     .player-card:has(.skin-bg.rank-1) .rank-badge { animation: none; }
     .spinner::after, .modal-loader-spinner::after, .rh-spinner::after, .profile-loader-spinner::after { animation: none; }
     .player-card:hover, .player-card:active, .kit-tier-col:hover { transform: none; }
+    #overall-tabulka > .player-card:nth-child(1),
+    #overall-tabulka > .player-card:nth-child(1)::before { animation: none; }
 }
