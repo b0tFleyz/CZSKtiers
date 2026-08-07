@@ -671,7 +671,18 @@ document.addEventListener('DOMContentLoaded', async function () {
             'kit_icons/pot.png':    'Pot',
             'kit_icons/smp.png':    'SMP',
             'kit_icons/diasmp.png': 'DiaSMP',
-            'kit_icons/mace.png':   'Mace'
+            'kit_icons/mace.png':   'Mace',
+            'kit_icons/speed.png':      'Speed',
+            'kit_icons/OGV.png':        'OGV',
+            'kit_icons/cart.png':       'Cart',
+            'kit_icons/creeper.png':    'Creeper',
+            'kit_icons/diavanilla.png': 'DiaVanilla',
+            'kit_icons/trident.png':    'Trident',
+            'kit_icons/manhunt.png':    'Manhunt',
+            'kit_icons/elytra.png':     'Elytra',
+            'kit_icons/bow.png':        'Bow',
+            'kit_icons/bed.png':        'Bed',
+            'kit_icons/debuff.png':     'Debuff'
         };
         return map[icon] || icon;
     }
