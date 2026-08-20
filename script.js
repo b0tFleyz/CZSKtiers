@@ -1672,20 +1672,6 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
         }
 
-        // Pre-compute peak tier earned timestamps for every player/kit
-        // Use the SAME function as the overall page (getPeakTierTextFromHistory)
-        const playerPeakScores = {}; // discordId -> { kitIcon -> score }
-        for (const did of allDiscordIds) {
-            playerPeakScores[did] = {};
-            for (const kit of kits) {
-                if (!validIcons.has(kit.icon)) continue;
-                const peakText = getPeakTierTextFromHistory(did, kit.icon);
-                if (peakText && PEAK_TIER_SCORE[peakText]) {
-                    playerPeakScores[did][kit.icon] = PEAK_TIER_SCORE[peakText];
-                }
-            }
-        }
-
         // Compute kit introduction dates from tier history (earliest event per kit)
         const kitIntroDate = {};
         for (const did in tierHistory) {
@@ -1749,6 +1735,19 @@ document.addEventListener('DOMContentLoaded', async function () {
             return tierVal;
         }
 
+        // Forward reconstruction: get the highest tier a player had reached in a kit
+        // as of a given timestamp (i.e. their "peak so far"), not their all-time peak.
+        function getPeakScoreAtTime(discordId, kitIcon, atTs) {
+            const events = sortedEvents[discordId]?.[kitIcon] || [];
+            let peakVal = 0;
+            for (const e of events) {
+                if (e._ts > atTs) break; // events are sorted ascending, so we can stop early
+                const v = parseInt(resolveTierValue(e.tier)) || 0;
+                if (v > peakVal) peakVal = v;
+            }
+            return peakVal;
+        }
+
         // Compute a player's score at a given timestamp using forward reconstruction
         function getPlayerScoreAtTime(discordId, atTs) {
             // For current time, use actual score from the overall spreadsheet (ground truth)
@@ -1756,15 +1755,15 @@ document.addEventListener('DOMContentLoaded', async function () {
                 return currentScores[discordId];
             }
             let s = 0;
-            const pe = playerPeakScores[discordId] || {};
             for (const kit of kits) {
                 if (!validIcons.has(kit.icon)) continue;
                 if (kitIntroDate[kit.icon] && atTs < kitIntroDate[kit.icon]) continue;
                 const tierVal = getTierAtTime(discordId, kit.icon, atTs);
-                // Peak bonuses apply from PEAK_SYSTEM_TS onward (when peak system was introduced)
+                // Peak bonuses apply from PEAK_SYSTEM_TS onward (when peak system was introduced),
+                // using the peak actually reached BY this timestamp (not the current all-time peak).
                 let peakScore = 0;
-                if (atTs >= PEAK_SYSTEM_TS && pe[kit.icon]) {
-                    peakScore = pe[kit.icon];
+                if (atTs >= PEAK_SYSTEM_TS) {
+                    peakScore = getPeakScoreAtTime(discordId, kit.icon, atTs);
                 }
                 s += Math.max(tierVal, peakScore);
             }
