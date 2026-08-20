@@ -2418,6 +2418,24 @@ document.addEventListener('DOMContentLoaded', async function () {
             // Also include current players
             currentDiscordIds.forEach(id => allDiscordIds.add(id));
 
+            // Blacklisted (removed) players should only appear up to the date of
+            // their own last recorded test - after that they're excluded entirely,
+            // instead of being held forward forever at their last known tier.
+            const blacklistedLastTestTs = {}; // discordId -> ts of last event (any kit)
+            for (const did of allDiscordIds) {
+                if (currentDiscordIds.has(did)) continue; // still active, not blacklisted
+                let maxTs = null;
+                const ph = tierHistory[did] || {};
+                for (const kitIcon of Object.keys(ph)) {
+                    if (!validIcons.has(kitIcon)) continue;
+                    ph[kitIcon].forEach(e => {
+                        const ts = parseCzechDate(e.date);
+                        if (ts && (maxTs === null || ts > maxTs)) maxTs = ts;
+                    });
+                }
+                if (maxTs !== null) blacklistedLastTestTs[did] = maxTs;
+            }
+
             // Pre-compute peak tier scores using the same function as the overall page
             const peakScores = {}; // discordId -> kitIcon -> score
             for (const did of allDiscordIds) {
@@ -2446,6 +2464,9 @@ document.addEventListener('DOMContentLoaded', async function () {
             const reconstructed = [];
 
             for (const discordId of allDiscordIds) {
+                // Blacklisted players stop appearing after the date of their last test
+                if (blacklistedLastTestTs[discordId] !== undefined && targetTs > blacklistedLastTestTs[discordId]) continue;
+
                 const playerHistory = tierHistory[discordId] || {};
                 const tiers = [];
                 let hasAnyTier = false;
