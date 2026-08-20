@@ -1658,6 +1658,31 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
         currentDiscordIds.forEach(id => allDiscordIds.add(id));
 
+        // Every player should only appear as a competitor in OTHER players' rank
+        // history starting from the date of their own first recorded test (they
+        // weren't on the tierlist before that, so they shouldn't count against
+        // anyone's rank before it), and - if they've since been removed/blacklisted -
+        // only up until the date of their last recorded test.
+        const firstTestTs = {};         // discordId -> ts of their first event (any kit)
+        const blacklistedLastTestTs = {}; // discordId -> ts of their last event (any kit), blacklisted only
+        for (const did of allDiscordIds) {
+            let minTs = null;
+            let maxTs = null;
+            const ph = tierHistory[did] || {};
+            for (const kitIcon of Object.keys(ph)) {
+                if (!validIcons.has(kitIcon)) continue;
+                ph[kitIcon].forEach(e => {
+                    const ts = parseCzechDate(e.date);
+                    if (!ts) return;
+                    if (minTs === null || ts < minTs) minTs = ts;
+                    if (maxTs === null || ts > maxTs) maxTs = ts;
+                });
+            }
+            if (minTs !== null) firstTestTs[did] = minTs;
+            // Only cap the upper end for players who are no longer on the current tierlist
+            if (!currentDiscordIds.has(did) && maxTs !== null) blacklistedLastTestTs[did] = maxTs;
+        }
+
         // Pre-sort events per player/kit for forward reconstruction
         const sortedEvents = {}; // discordId -> kitIcon -> sorted events array
         for (const did of allDiscordIds) {
@@ -1735,17 +1760,22 @@ document.addEventListener('DOMContentLoaded', async function () {
             return tierVal;
         }
 
-        // Forward reconstruction: get the highest tier a player had reached in a kit
+        // Forward reconstruction: get the peak tier SCORE a player had reached in a kit
         // as of a given timestamp (i.e. their "peak so far"), not their all-time peak.
+        // Reuses the same computePeakTierText + PEAK_TIER_SCORE pipeline used everywhere
+        // else in the app (getPeakTierTextFromHistory), just fed a time-filtered slice of
+        // the kit's RAW history (same order as stored) so the result reflects what the
+        // peak actually was AT that point in time, not the current all-time peak.
         function getPeakScoreAtTime(discordId, kitIcon, atTs) {
-            const events = sortedEvents[discordId]?.[kitIcon] || [];
-            let peakVal = 0;
-            for (const e of events) {
-                if (e._ts > atTs) break; // events are sorted ascending, so we can stop early
-                const v = parseInt(resolveTierValue(e.tier)) || 0;
-                if (v > peakVal) peakVal = v;
-            }
-            return peakVal;
+            const rawEvents = (tierHistory[discordId] || {})[kitIcon] || [];
+            if (!rawEvents.length) return 0;
+            const eventsUpToTs = rawEvents.filter(e => {
+                const ts = parseCzechDate(e.date);
+                return ts !== null && ts !== undefined && ts <= atTs;
+            });
+            if (!eventsUpToTs.length) return 0;
+            const peakText = computePeakTierText(eventsUpToTs);
+            return (peakText && PEAK_TIER_SCORE[peakText]) ? PEAK_TIER_SCORE[peakText] : 0;
         }
 
         // Compute a player's score at a given timestamp using forward reconstruction
@@ -1786,6 +1816,10 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
             for (const did of allDiscordIds) {
                 if (did === targetDiscordId) continue;
+                // A player only counts as a competitor from their own first test date onward
+                if (firstTestTs[did] !== undefined && atTs < firstTestTs[did]) continue;
+                // Blacklisted players only count as competitors up to their last test date
+                if (blacklistedLastTestTs[did] !== undefined && atTs > blacklistedLastTestTs[did]) continue;
                 if (getPlayerScoreAtTime(did, atTs) > targetScore) rank++;
             }
             return rank;
