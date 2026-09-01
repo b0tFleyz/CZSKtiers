@@ -126,6 +126,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     let discordIdToNick = {}; // Discord ID → Nick, built from spreadsheet data
     let tierHistory = {}; // keyed by discordId → kitIcon → [{tier, date, note, kit, oldTier}]
 
+    // Drzime referenci, at se pri kazdem prekresleni (filtr) nehromadi observery.
+    let _overallObserver = null;
+
     // Time Machine state
     let _tmActive = false;
     let _tmBlacklistedIds = new Set();
@@ -280,12 +283,52 @@ document.addEventListener('DOMContentLoaded', async function () {
         renderOverall(overallData);
     }
 
+    // === Rychlá cesta: snapshot vygenerovaný botem ======================
+    // Hlavní stránka díky tomu nestahuje celý XLSX workbook (oba servery +
+    // obě TierHistory záložky) ani SheetJS — jen ~74 KB JSON. Historie se
+    // dotahuje až na vyžádání (viz ensureHistoryLoaded).
+    async function nactiOverallSnapshot() {
+        const snap = await CZSKData.loadOverall(_guild);
+        overallData = CZSKData.toOverallData(snap, _guild);
+        overallData.forEach(p => {
+            if (p.discordId && p.nick) discordIdToNick[p.discordId] = p.nick;
+        });
+        renderOverall(overallData);
+    }
+
+    // Historii potřebují jen detailní pohledy (karta hráče, grafy, porovnání).
+    // Zavolej a počkej, než sáhneš na `tierHistory`.
+    let _historyPromise = null;
+    async function ensureHistoryLoaded() {
+        if (_usingSnapshot === false) return;              // XLSX cesta ji má už v paměti
+        if (CZSKData.isHistoryLoaded(_guild)) return;
+        if (!_historyPromise) {
+            const other = _guild === 'subtiers' ? 'czsktiers' : 'subtiers';
+            _historyPromise = Promise.all([
+                CZSKData.hydrateHistory(_guild, tierHistory),
+                CZSKData.hydrateHistory(other, tierHistory).catch(() => {})
+            ]);
+        }
+        await _historyPromise;
+    }
+    window.ensureHistoryLoaded = ensureHistoryLoaded;
+
     // Načti overall jako karty s error handlingem
     const loadingIndicator = document.getElementById('loading-indicator');
     const errorMessage = document.getElementById('error-message');
 
+    let _usingSnapshot = null;
     try {
-        await nactiOverallExcel();
+        try {
+            await nactiOverallSnapshot();
+            _usingSnapshot = true;
+        } catch (snapErr) {
+            // Snapshot ještě neexistuje (bot neběžel) — spadni na starou cestu,
+            // ať se stránka nikdy nerozbije kvůli chybějícím datům.
+            console.warn('[data] snapshot nedostupný, načítám XLSX:', snapErr.message);
+            _usingSnapshot = false;
+            await nactiOverallExcel();
+        }
         if (loadingIndicator) loadingIndicator.style.display = 'none';
         const tabulka = document.getElementById('overall-tabulka');
         if (tabulka) tabulka.classList.remove('tabulka-loading');
@@ -297,7 +340,13 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Get earliest tier history date for a player (how long on tierlist)
     function getPlayerFirstDate(discordId) {
-        if (!discordId || !tierHistory[discordId]) return null;
+        // Snapshot posila prvni datum rovnou, takze hlavni stranka kvuli nemu
+        // nemusi stahovat celou historii.
+        if (!discordId) return null;
+        if (!tierHistory[discordId]) {
+            const p = overallData.find(x => x.discordId === discordId);
+            return (p && p.firstDate) || null;
+        }
         let earliest = Infinity;
         for (const entries of Object.values(tierHistory[discordId])) {
             for (const e of entries) {
@@ -310,6 +359,76 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Single source of truth for the kit-badge markup shown on cards and in the
     // player modal. Expects tier objects already filtered + sorted by the caller.
+    // === Peak tier / retire progress ==================================
+    // Zdroj pravdy je bot: snapshot posílá u každého kitu `peak` (zamčený peak),
+    // `canRetire` a `pending` (běžící hodiny — dny, potřeba, výhry). Stejná čísla,
+    // jaká hráč vidí v Discordu přes /retire. Tady se nic nepočítá znovu.
+    function renderPeakProgress(el, tiers) {
+        if (!el) return;
+        const rows = (tiers || []).filter(t => t && (t.peak || t.pending));
+        if (rows.length === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
+
+        // Nejzajímavější nahoře: hotové retire, pak rozdělané hodiny podle postupu.
+        rows.sort((a, b) => {
+            const aDone = a.canRetire ? 0 : 1, bDone = b.canRetire ? 0 : 1;
+            if (aDone !== bDone) return aDone - bDone;
+            const ap = a.pending ? a.pending.days / a.pending.required : -1;
+            const bp = b.pending ? b.pending.days / b.pending.required : -1;
+            return bp - ap;
+        });
+
+        const kitName = icon => {
+            const m = String(icon || '').match(/([^/]+)\.png$/i);
+            return m ? m[1].toUpperCase() : '?';
+        };
+
+        const html = rows.map(t => {
+            const name = kitName(t.icon);
+            const parts = [];
+
+            if (t.peak) {
+                parts.push(
+                    '<span class="peak-locked' + (t.canRetire ? ' peak-retire-ok' : '') + '">' +
+                        '\u{1F451} Peak <b>' + _pEsc(t.peak) + '</b>' +
+                        (t.canRetire ? ' \u2014 retire mo\u017En\u00FD' : '') +
+                    '</span>'
+                );
+            }
+
+            if (t.pending) {
+                const p = t.pending;
+                const pct = Math.max(0, Math.min(100, Math.round((p.days / p.required) * 100)));
+                const winNote = p.maxWins > 0
+                    ? ' \u00B7 v\u00FDhry ' + p.wins + '/' + p.maxWins
+                    : '';
+                parts.push(
+                    '<span class="peak-pending">' +
+                        '\u23F3 <b>' + _pEsc(p.tier) + '</b> ' + p.days + '/' + p.required + ' dn\u00ED' +
+                        (p.left > 0 ? ' \u00B7 zb\u00FDv\u00E1 ' + p.left : ' \u00B7 splněno') +
+                        winNote +
+                    '</span>' +
+                    '<span class="peak-bar"><span class="peak-bar-fill" style="width:' + pct + '%"></span></span>'
+                );
+            }
+
+            return '<div class="peak-row">' +
+                       '<span class="peak-kit">' +
+                           '<img src="' + _pEsc(t.icon) + '" alt="" loading="lazy">' + _pEsc(name) +
+                       '</span>' +
+                       '<span class="peak-info">' + parts.join('') + '</span>' +
+                   '</div>';
+        }).join('');
+
+        el.innerHTML = '<div class="peak-title">Peak tier a retire</div>' + html;
+        el.style.display = '';
+    }
+
+    function _pEsc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
     function buildKitBadgesHtml(sortedTiers) {
         return sortedTiers.map(t => {
             const info = tierInfo(String(t.tier));
@@ -332,7 +451,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                         </span>
                         <span class="tooltiptext">
                             <strong>${origText}</strong><br>
-                            ${t.peakTierText ? PEAK_TIER_SCORE[t.peakTierText] : t.tier} pts${t.peakTierText ? `<br><span style="font-size:0.85em;opacity:0.7;">Peak: ${t.peakTierText}</span>` : ''}
+                            ${(t.peakTierText && PEAK_TIER_SCORE[t.peakTierText]) || t.tier} pts${t.peakTierText ? `<br><span style="font-size:0.85em;opacity:0.7;">Peak: ${t.peakTierText}</span>` : ''}
                         </span>
                     </span>
                 `;
@@ -459,8 +578,9 @@ document.addEventListener('DOMContentLoaded', async function () {
             // Score click — show score history graph
             const scoreEl = card.querySelector('.score-clickable');
             if (scoreEl) {
-                scoreEl.addEventListener('click', (e) => {
+                scoreEl.addEventListener('click', async (e) => {
                     e.stopPropagation();
+                    await ensureHistoryLoaded();
                     showScoreGraph(player.nick, player.discordId || '', player.score);
                 });
             }
@@ -508,7 +628,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         sentinel.style.height = '1px';
         container.appendChild(sentinel);
         
-        const observer = new IntersectionObserver((entries) => {
+        if (_overallObserver) { try { _overallObserver.disconnect(); } catch (e) {} }
+        const observer = _overallObserver = new IntersectionObserver((entries) => {
             if (entries[0].isIntersecting) {
                 const hasMore = loadMoreCards();
                 if (!hasMore) {
@@ -848,6 +969,88 @@ document.addEventListener('DOMContentLoaded', async function () {
         });
     }
 
+    // === Průběh testů pod Tier Journey ================================
+    // Bot od teď ukládá ke každému testu i jednotlivé souboje (kdo, jaké skóre) —
+    // viz `fights` v tierHistory. Starší záznamy je nemají, u těch se ukáže aspoň
+    // seznam soupeřů, a když není ani ten, samotný verdikt.
+    const FIGHT_GROUP_LABEL = {
+        lt3: 'LT3', ht3: 'HT3', lt2: 'LT2', ht2: 'HT2', lt1: 'LT1', ht1: 'HT1'
+    };
+    const VERDICT_STYLE = {
+        'Získává':  { cls: 'tj-v-up',   icon: '\u25B2' },
+        'Zůstává':  { cls: 'tj-v-same', icon: '\u25CF' },
+        'Demote':   { cls: 'tj-v-down', icon: '\u25BC' },
+        'Retired':  { cls: 'tj-v-ret',  icon: '\u2691' },
+        'Unretire': { cls: 'tj-v-same', icon: '\u21BA' }
+    };
+
+    function _nickOf(discordId) {
+        return discordIdToNick[discordId] || null;
+    }
+
+    function renderTestList(container, history) {
+        if (!container) return;
+        // Nejnovější nahoře — lidi zajímá poslední test, ne ten z roku 2023.
+        const rows = [...history].sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        if (rows.length === 0) { container.innerHTML = ''; container.style.display = 'none'; return; }
+
+        const html = rows.map((h, idx) => {
+            const vs = VERDICT_STYLE[h.note] || { cls: 'tj-v-same', icon: '\u25CF' };
+            const when = h.ts ? new Date(h.ts).toLocaleDateString('cs-CZ') : '';
+            const tierNow = h.tier ? getOriginalTierText(resolveTierValue(h.tier) || '') : '';
+            const tierOld = h.oldTier ? getOriginalTierText(resolveTierValue(h.oldTier) || '') : '';
+            const change = (tierOld && tierOld !== '-' && tierOld !== tierNow)
+                ? `${escapeXml(tierOld)} \u2192 <b>${escapeXml(tierNow)}</b>`
+                : `<b>${escapeXml(tierNow || h.tier || '')}</b>`;
+
+            let detail = '';
+            if (Array.isArray(h.fights) && h.fights.length) {
+                detail = '<div class="tj-fights">' + h.fights.map(f => {
+                    const win = Number(f.s) > Number(f.os);
+                    const nick = _nickOf(f.o);
+                    const who = nick ? escapeXml(nick) : 'neznámý hráč';
+                    const grp = FIGHT_GROUP_LABEL[f.g] ? `<span class="tj-fgroup">${FIGHT_GROUP_LABEL[f.g]}</span>` : '';
+                    return `<div class="tj-fight ${win ? 'tj-win' : 'tj-loss'}">
+                                ${grp}
+                                <span class="tj-fscore">${Number(f.s)}\u2013${Number(f.os)}</span>
+                                <span class="tj-fopp">${who}</span>
+                                <span class="tj-fres">${win ? 'výhra' : 'prohra'}</span>
+                            </div>`;
+                }).join('') + '</div>';
+            } else if (Array.isArray(h.opponents) && h.opponents.length) {
+                const names = h.opponents.map(id => escapeXml(_nickOf(id) || id)).join(', ');
+                detail = `<div class="tj-fights tj-fights-legacy">Soupeři: ${names}
+                          <div class="tj-legacy-note">U tohoto testu nejsou uložená skóre.</div></div>`;
+            } else {
+                detail = '<div class="tj-fights tj-fights-legacy">Detail soubojů není uložený.</div>';
+            }
+
+            return `<div class="tj-test" data-idx="${idx}">
+                        <button class="tj-test-head" type="button" aria-expanded="false">
+                            <span class="tj-vbadge ${vs.cls}">${vs.icon}</span>
+                            <span class="tj-verdict">${escapeXml(h.note || '')}</span>
+                            <span class="tj-change">${change}</span>
+                            <span class="tj-date">${escapeXml(when)}</span>
+                            <span class="tj-caret">\u203A</span>
+                        </button>
+                        <div class="tj-test-body" hidden>${detail}</div>
+                    </div>`;
+        }).join('');
+
+        container.innerHTML = `<div class="tj-tests-title">Průběh testů (${rows.length})</div>` + html;
+        container.style.display = '';
+
+        container.onclick = (e) => {
+            const head = e.target.closest('.tj-test-head');
+            if (!head) return;
+            const body = head.parentNode.querySelector('.tj-test-body');
+            const open = !body.hidden;
+            body.hidden = open;
+            head.setAttribute('aria-expanded', String(!open));
+            head.parentNode.classList.toggle('tj-open', !open);
+        };
+    }
+
     function showTierJourney(playerNick, kitIcon, currentTierValue, discordId) {
         let raw = (discordId && tierHistory[discordId] && tierHistory[discordId][kitIcon]) || [];
 
@@ -878,6 +1081,8 @@ document.addEventListener('DOMContentLoaded', async function () {
             history
         );
 
+        renderTestList(journeyModal.querySelector('#tier-journey-tests'), history);
+
         journeyModal.style.display = 'flex';
     }
 
@@ -894,6 +1099,9 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // MODAL funkce
     async function showPlayerModal({ name, position, score, skin, kitsHtml, tiers, nick, discordId, hallOfFame, tester, allTestedIcons }) {
+        // Karta hráče potřebuje tier historii (achievementy, tier journey).
+        // Na hlavní stránce se nestahuje — dotáhne se až tady, při prvním otevření.
+        await ensureHistoryLoaded();
         const modal = document.getElementById('player-modal');
         const content = modal.querySelector('.player-modal-content');
         const banner = modal.querySelector('#player-modal-banner');
@@ -1062,8 +1270,9 @@ document.addEventListener('DOMContentLoaded', async function () {
                 badge.classList.add('badge-journey-clickable');
                 const fresh = badge.cloneNode(true);
                 badge.parentNode.replaceChild(fresh, badge);
-                fresh.addEventListener('click', (e) => {
+                fresh.addEventListener('click', async (e) => {
                     e.stopPropagation();
+                    await ensureHistoryLoaded();
                     showTierJourney(nick, kitIcon, String(match.tier), discordId);
                 });
             });
@@ -1083,6 +1292,11 @@ document.addEventListener('DOMContentLoaded', async function () {
                 achEl.style.display = 'none';
             }
         }
+
+        // Peak tier / retire progress — data počítá bot (viz bot/publish-snapshot.js),
+        // takže tady se jen vykresluje. Ve fallback režimu (XLSX) tahle pole chybí
+        // a sekce se prostě nezobrazí.
+        renderPeakProgress(modal.querySelector('#player-modal-peak'), tiers);
 
         // Remove loading state — reveal content
         content.classList.remove('modal-loading');
@@ -2145,12 +2359,13 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
 
     // Rank History button in player modal — use event delegation
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', async (e) => {
         if (!e.target.closest('#rank-history-btn')) return;
         const modal = document.getElementById('player-modal');
         const nick = modal.querySelector('.player-modal-name').textContent;
         const player = allPlayers.find(p => p.nick === nick);
         if (!player || !player.discordId) return;
+        await ensureHistoryLoaded();   // rank history potrebuje historii VSECH hracu
         showRankHistory(nick, player.discordId);
     });
 
@@ -2173,6 +2388,12 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Positions come from the shared cache (avoids yet another full sort here)
         const positionMap = getPositionMap();
+
+        // POZOR: getMatches() níž pracovalo s `sorted`, které se ale deklaruje jako
+        // lokální const uvnitř getPositionMap() — tady tedy nikdy nebylo v scope.
+        // Každé vyhledávání shodilo ReferenceError a seznam zůstal prázdný, takže
+        // porovnání nešlo dokončit vůbec. Vlastní seřazená kopie to řeší.
+        const sorted = [...allPlayers].sort((a, b) => b.score - a.score);
 
         picker = document.createElement('div');
         picker.id = 'compare-picker';
@@ -2250,7 +2471,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 const playerB = matches[idx];
                 if (playerB) {
                     picker.remove();
-                    showCompareModal(comparePlayerA, playerB);
+                    ensureHistoryLoaded().then(() => showCompareModal(comparePlayerA, playerB));
                 }
             };
         }
@@ -2283,6 +2504,89 @@ document.addEventListener('DOMContentLoaded', async function () {
         requestAnimationFrame(() => input.focus());
     }
 
+    // Efektivní tier pro porovnání = lepší z (aktuální tier, peak tier).
+    // Skóre na kartě se počítá stejně (peak boost), takže když by se tady
+    // porovnával jen aktuální tier, hráč s vyšším skóre mohl "prohrát" kit,
+    // ve kterém má lepší peak — což vypadalo jako chyba.
+    function getEffectiveTierForKit(player, kitIcon) {
+        const t = getBestTierForKit(player, kitIcon);
+        const peakText = t && t.peakTierText ? t.peakTierText : null;
+        const curVal = t ? parseInt(t.tier) : 0;
+        const peakVal = peakText ? parseInt(PEAK_TIER_SCORE[peakText] || 0) : 0;
+        if (!t && !peakVal) return null;
+        const useValue = Math.max(isNaN(curVal) ? 0 : curVal, peakVal);
+        return {
+            value: useValue,
+            display: String(useValue),
+            fromPeak: peakVal > (isNaN(curVal) ? 0 : curVal),
+            peakText: peakText,
+            canRetire: !!(t && t.canRetire),
+            pending: t ? t.pending : null
+        };
+    }
+
+    // Vzájemná bilance ze skutečných soubojů. Bere obě strany historie:
+    // souboj se ukládá k testovanému, takže když spolu hráli v testu A i v testu B,
+    // najdeme ho jednou u A a jednou u B — proto se deduplikuje přes (datum, kit, skóre).
+    function computeHeadToHead(idA, idB) {
+        if (!idA || !idB) return null;
+        const seen = new Set();
+        let winsA = 0, winsB = 0, draws = 0;
+        const bouts = [];
+
+        const scan = (owner, other, flip) => {
+            const byKit = tierHistory[owner] || {};
+            for (const kitIcon of Object.keys(byKit)) {
+                for (const h of byKit[kitIcon]) {
+                    if (!Array.isArray(h.fights)) continue;
+                    for (const f of h.fights) {
+                        if (f.o !== other) continue;
+                        // skóre vždy z pohledu hráče A
+                        const sA = flip ? Number(f.os) : Number(f.s);
+                        const sB = flip ? Number(f.s)  : Number(f.os);
+                        const key = [h.ts || 0, kitIcon, Math.min(sA, sB), Math.max(sA, sB)].join('|');
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        if (sA > sB) winsA++; else if (sB > sA) winsB++; else draws++;
+                        bouts.push({ ts: h.ts || 0, kitIcon, sA, sB });
+                    }
+                }
+            }
+        };
+        scan(idA, idB, false);
+        scan(idB, idA, true);
+
+        if (!bouts.length) return null;
+        bouts.sort((x, y) => y.ts - x.ts);
+        return { winsA, winsB, draws, bouts, total: bouts.length };
+    }
+
+    function renderHeadToHead(h2h, pA, pB) {
+        if (!h2h) {
+            return `<div class="compare-h2h compare-h2h-empty">Zatím spolu nehráli žádný zaznamenaný souboj.</div>`;
+        }
+        const lead = h2h.winsA > h2h.winsB ? _pEsc(pA.nick)
+                   : h2h.winsB > h2h.winsA ? _pEsc(pB.nick) : null;
+        const list = h2h.bouts.slice(0, 6).map(b => {
+            const when = b.ts ? new Date(b.ts).toLocaleDateString('cs-CZ') : '';
+            const cls = b.sA > b.sB ? 'h2h-a' : b.sB > b.sA ? 'h2h-b' : 'h2h-d';
+            return `<div class="compare-h2h-row ${cls}">
+                        <img src="${_pEsc(b.kitIcon)}" alt="" class="compare-h2h-kit">
+                        <span class="compare-h2h-score">${b.sA}\u2013${b.sB}</span>
+                        <span class="compare-h2h-date">${_pEsc(when)}</span>
+                    </div>`;
+        }).join('');
+        return `<div class="compare-h2h">
+                    <div class="compare-h2h-title">
+                        Vzájemná bilance \u00B7 <b>${h2h.winsA}\u2013${h2h.winsB}</b>
+                        ${h2h.draws ? ` (${h2h.draws} remíz)` : ''}
+                        ${lead ? ` \u00B7 vede <b>${lead}</b>` : ' \u00B7 vyrovnané'}
+                    </div>
+                    <div class="compare-h2h-list">${list}</div>
+                    ${h2h.total > 6 ? `<div class="compare-h2h-more">+ dalších ${h2h.total - 6} soubojů</div>` : ''}
+                </div>`;
+    }
+
     function showCompareModal(pA, pB) {
         const modal = document.getElementById('compare-modal');
         if (!modal) return;
@@ -2292,77 +2596,91 @@ document.addEventListener('DOMContentLoaded', async function () {
         const stA = getScoreTitle(pA.score);
         const stB = getScoreTitle(pB.score);
 
-        // Fill left player
-        const left = modal.querySelector('.compare-player-left');
-        left.querySelector('.compare-skin').src = `https://mc-heads.net/avatar/${pA.uuid || pA.nick}/64`;
-        left.querySelector('.compare-name').textContent = pA.nick;
-        left.querySelector('.compare-rank').textContent = `#${posA}`;
-        left.querySelector('.compare-score').textContent = pA.score;
-        left.querySelector('.compare-score-title').textContent = stA.title;
-        left.querySelector('.compare-score-title').style.color = stA.color;
+        const fillSide = (side, p, pos, st, otherScore) => {
+            const el = modal.querySelector(side);
+            el.querySelector('.compare-skin').src = `https://mc-heads.net/avatar/${p.uuid || p.nick}/64`;
+            el.querySelector('.compare-name').textContent = p.nick;
+            el.querySelector('.compare-rank').textContent = `#${pos}`;
+            const scoreEl = el.querySelector('.compare-score');
+            scoreEl.textContent = p.score;
+            scoreEl.className = 'compare-score' +
+                (p.score > otherScore ? ' compare-better' : p.score < otherScore ? ' compare-worse' : '');
+            const titleEl = el.querySelector('.compare-score-title');
+            titleEl.textContent = st.title;
+            titleEl.style.color = st.color;
+            return el;
+        };
+        fillSide('.compare-player-left', pA, posA, stA, pB.score);
+        fillSide('.compare-player-right', pB, posB, stB, pA.score);
 
-        // Fill right player
-        const right = modal.querySelector('.compare-player-right');
-        right.querySelector('.compare-skin').src = `https://mc-heads.net/avatar/${pB.uuid || pB.nick}/64`;
-        right.querySelector('.compare-name').textContent = pB.nick;
-        right.querySelector('.compare-rank').textContent = `#${posB}`;
-        right.querySelector('.compare-score').textContent = pB.score;
-        right.querySelector('.compare-score-title').textContent = stB.title;
-        right.querySelector('.compare-score-title').style.color = stB.color;
-
-        // Score comparison color
-        left.querySelector('.compare-score').className = 'compare-score' + (pA.score > pB.score ? ' compare-better' : pA.score < pB.score ? ' compare-worse' : '');
-        right.querySelector('.compare-score').className = 'compare-score' + (pB.score > pA.score ? ' compare-better' : pB.score < pA.score ? ' compare-worse' : '');
-
-        // Kit-by-kit comparison
+        // --- Kit po kitu ---
         const kitsDiv = modal.querySelector('.compare-kits');
-        let kitsHtml = '';
-        let winsA = 0, winsB = 0, draws = 0;
+        let rowsHtml = '';
+        let winsA = 0, winsB = 0, draws = 0, shared = 0;
 
-        kits.forEach(kit => {
-            const tierA = getBestTierForKit(pA, kit.icon);
-            const tierB = getBestTierForKit(pB, kit.icon);
-            const valA = tierA ? parseInt(tierA.tier) : 0;
-            const valB = tierB ? parseInt(tierB.tier) : 0;
-            const infoA = tierA ? tierInfo(String(tierA.tier)) : null;
-            const infoB = tierB ? tierInfo(String(tierB.tier)) : null;
-            const origA = tierA ? getOriginalTierText(String(tierA.tier)) : '-';
-            const origB = tierB ? getOriginalTierText(String(tierB.tier)) : '-';
+        const badgeFor = eff => {
+            if (!eff) return '<span class="compare-tier-badge compare-tier-none">-</span>';
+            const info = tierInfo(eff.display);
+            const orig = getOriginalTierText(eff.display);
+            const isR = orig.startsWith('R');
+            const style = `background:${isR ? '#23242a' : info.barvaPozadi};color:${isR ? info.barvaTextu : '#23242a'};`;
+            // Hvězdička = tier drží díky zamčenému peaku, ne díky aktuální roli
+            const star = eff.fromPeak ? '<span class="compare-peak-star" title="Peak tier">&#9733;</span>' : '';
+            return `<span class="compare-tier-badge" style="${style}">${info.novyText}${star}</span>`;
+        };
 
+        // Kity, které nehraje ani jeden, nemá smysl vypisovat — dřív zabíraly
+        // půlku tabulky prázdnými pomlčkami.
+        const rows = kits.map(kit => ({
+            kit,
+            a: getEffectiveTierForKit(pA, kit.icon),
+            b: getEffectiveTierForKit(pB, kit.icon)
+        })).filter(r => r.a || r.b);
+
+        rows.forEach(r => {
+            const valA = r.a ? r.a.value : 0;
+            const valB = r.b ? r.b.value : 0;
             let winClass = '';
             if (valA > valB) { winClass = 'win-left'; winsA++; }
             else if (valB > valA) { winClass = 'win-right'; winsB++; }
             else if (valA > 0) { draws++; }
+            if (r.a && r.b) shared++;
 
-            const badgeA = infoA
-                ? `<span class="compare-tier-badge" style="background:${origA.startsWith('R') ? '#23242a' : infoA.barvaPozadi};color:${origA.startsWith('R') ? infoA.barvaTextu : '#23242a'};">${infoA.novyText}</span>`
-                : '<span class="compare-tier-badge compare-tier-none">-</span>';
-            const badgeB = infoB
-                ? `<span class="compare-tier-badge" style="background:${origB.startsWith('R') ? '#23242a' : infoB.barvaPozadi};color:${origB.startsWith('R') ? infoB.barvaTextu : '#23242a'};">${infoB.novyText}</span>`
-                : '<span class="compare-tier-badge compare-tier-none">-</span>';
-
-            kitsHtml += `
+            rowsHtml += `
                 <div class="compare-kit-row ${winClass}">
-                    <div class="compare-kit-cell compare-kit-left">${badgeA}</div>
+                    <div class="compare-kit-cell compare-kit-left">${badgeFor(r.a)}</div>
                     <div class="compare-kit-cell compare-kit-center">
-                        <img src="${kit.icon}" alt="" class="compare-kit-icon">
+                        <img src="${r.kit.icon}" alt="${_pEsc(r.kit.key || '')}" class="compare-kit-icon" title="${_pEsc(r.kit.key || '')}">
                     </div>
-                    <div class="compare-kit-cell compare-kit-right">${badgeB}</div>
+                    <div class="compare-kit-cell compare-kit-right">${badgeFor(r.b)}</div>
                 </div>
             `;
         });
-        kitsDiv.innerHTML = kitsHtml;
 
-        // Summary
+        kitsDiv.innerHTML = rowsHtml || '<div class="compare-empty">Ani jeden hráč nemá žádný tier.</div>';
+
+        // --- Souhrn: kdo vede, o kolik, a v kolika kitech se potkávají ---
         const summaryDiv = modal.querySelector('.compare-summary');
+        const diff = Math.abs(pA.score - pB.score);
+        let verdict;
+        if (winsA > winsB)      verdict = `<strong>${_pEsc(pA.nick)}</strong> vede ${winsA}:${winsB}`;
+        else if (winsB > winsA) verdict = `<strong>${_pEsc(pB.nick)}</strong> vede ${winsB}:${winsA}`;
+        else                    verdict = `Nerozhodně ${winsA}:${winsB}`;
+
+        const h2h = computeHeadToHead(pA.discordId, pB.discordId);
         summaryDiv.innerHTML = `
-            <span class="compare-wins">${pA.nick}: ${winsA}</span>
-            <span class="compare-draw">Remíza: ${draws}</span>
-            <span class="compare-wins">${pB.nick}: ${winsB}</span>
+            <div class="compare-verdict">${verdict}</div>
+            <div class="compare-meta">
+                <span>${draws} ${draws === 1 ? 'remíza' : 'remíz'}</span>
+                <span>${shared} společných kitů</span>
+                <span>${diff === 0 ? 'stejné skóre' : `rozdíl ${diff} pts`}</span>
+            </div>
+            ${renderHeadToHead(h2h, pA, pB)}
         `;
 
         modal.style.display = 'flex';
     }
+
 
     // Close compare modal
     (() => {

@@ -137,103 +137,35 @@ function loadFullPlayerData() {
     _fullDataLoading = true;
 
     const _guild = (typeof getActiveGuild === 'function') ? getActiveGuild() : 'czsktiers';
-    const _conf = (typeof getGuildConf === 'function') ? getGuildConf(_guild) : null;
 
-    getWorkbook()
-        .then(workbook => {
-
-            // Load TierHistory for peak tier data
-            kitPageTierHistory = {};
-            const iconMap = {
-                'Crystal': 'kit_icons/cpvp.png', 'Axe': 'kit_icons/axe.png',
-                'Sword': 'kit_icons/sword.png', 'UHC': 'kit_icons/uhc.png',
-                'Npot': 'kit_icons/npot.png', 'NPot': 'kit_icons/npot.png',
-                'Pot': 'kit_icons/pot.png', 'SMP': 'kit_icons/smp.png',
-                'DiaSMP': 'kit_icons/diasmp.png', 'Mace': 'kit_icons/mace.png',
-                'Speed': 'kit_icons/speed.png', 'OGV': 'kit_icons/OGV.png',
-                'Cart': 'kit_icons/cart.png', 'Creeper': 'kit_icons/creeper.png',
-                'DiaVanilla': 'kit_icons/diavanilla.png'
-            };
-            const _histTab = _conf ? _conf.tierHistoryTab : 'TierHistory';
-            const histSheetName = workbook.SheetNames.find(n => n === _histTab) || workbook.SheetNames.find(n => n === 'TierHistory');
-            if (histSheetName) {
-                const histRows = XLSX.utils.sheet_to_json(workbook.Sheets[histSheetName]);
-                histRows.forEach(row => {
-                    if (!row.Kit || !row.Tier) return;
-                    const did = row['Discord ID'] ? String(row['Discord ID']).trim() : null;
-                    if (!did) return;
-                    const icon = iconMap[String(row.Kit).trim()] || null;
-                    if (!icon) return;
-                    const tier = String(row.Tier).trim();
-                    const oldTier = row.OldTier ? String(row.OldTier).trim() : null;
-                    const date    = row.Date    ? String(row.Date).trim()    : null;
-                    if (!kitPageTierHistory[did]) kitPageTierHistory[did] = {};
-                    if (!kitPageTierHistory[did][icon]) kitPageTierHistory[did][icon] = [];
-                    kitPageTierHistory[did][icon].push({ tier, oldTier, date });
-                });
-            }
-
-            // Pick correct sheet tab for active guild
-            const _sheetTab = _conf ? _conf.sheetTab : null;
-            let worksheet;
-            if (_sheetTab) {
-                worksheet = workbook.Sheets[_sheetTab];
-            } else {
-                worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            }
-            if (!worksheet) worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json(worksheet);
-
-            // Use guild-specific kits
-            const CZSK_KITS_AC = [
-                { key: "Crystal", icon: "kit_icons/cpvp.png" },
-                { key: "Axe", icon: "kit_icons/axe.png" },
-                { key: "Sword", icon: "kit_icons/sword.png" },
-                { key: "UHC", icon: "kit_icons/uhc.png" },
-                { key: "Npot", icon: "kit_icons/npot.png" },
-                { key: "Pot", icon: "kit_icons/pot.png" },
-                { key: "SMP", icon: "kit_icons/smp.png" },
-                { key: "DiaSMP", icon: "kit_icons/diasmp.png" },
-                { key: "Mace", icon: "kit_icons/mace.png" }
-            ];
-            const SUB_KITS_AC = [
-                { key: "Speed", icon: "kit_icons/speed.png" },
-                { key: "OGV", icon: "kit_icons/OGV.png" },
-                { key: "Cart", icon: "kit_icons/cart.png" },
-                { key: "Creeper", icon: "kit_icons/creeper.png" },
-                { key: "DiaVanilla", icon: "kit_icons/diavanilla.png" }
-            ];
-            const kits = (_guild === 'subtiers') ? SUB_KITS_AC : CZSK_KITS_AC;
-            
-            fullPlayerData = rows.filter(row => row.UUID && row.Nick).map(row => {
+    // Snapshot od bota misto celeho XLSX workbooku. Kity se berou z GUILD_CONFIG,
+    // takze uz nemuzou chybet nove pridane kity (drive tu byl natvrdo zapsany
+    // seznam, kteremu chybel Trident, Manhunt, Elytra, Bow, Bed i Debuff).
+    CZSKData.loadOverall(_guild)
+        .then(snap => {
+            const iconByKit = CZSKData.kitIconMap(_guild);
+            kitPageTierHistory = {};   // historie se na tehle strance nepotrebuje
+            fullPlayerData = (snap.players || []).filter(p => p.nick).map(p => {
                 const tiers = [];
-                kits.forEach(kit => {
-                    const val = row[kit.key];
-                    if (val && val !== "-" && val !== "N/A") {
-                        tiers.push({ tier: String(val), icon: kit.icon });
-                    }
+                (snap.kits || []).forEach(kitKey => {
+                    const t = p.tiers[kitKey];
+                    if (!t || t.pts == null) return;
+                    tiers.push({
+                        tier: String(t.pts),
+                        icon: iconByKit[kitKey],
+                        // Bot uz rozhodl, jestli peak realne zvedá skore.
+                        peakTierText: t.peakBoost || null
+                    });
                 });
-                
-                let overallScore = 0;
-                tiers.forEach(t => {
-                    const num = parseFloat(t.tier);
-                    if (!isNaN(num)) {
-                        const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : '';
-                        const peakText = discordId ? getPeakTierTextAC(discordId, t.icon) : null;
-                        const peakScore = peakText ? (PEAK_TIER_SCORE[peakText] || 0) : 0;
-                        overallScore += Math.max(num, peakScore);
-                        t.peakTierText = (peakScore > num) ? peakText : null;
-                    }
-                });
-                
                 return {
-                    uuid: row.UUID,
-                    nick: row.Nick,
-                    discordId: row['Discord ID'] ? String(row['Discord ID']).trim() : '',
-                    score: overallScore,
+                    uuid: p.uuid || null,
+                    nick: p.nick,
+                    discordId: p.id || '',
+                    score: p.score || 0,
                     tiers: tiers
                 };
             });
+            _fullDataLoading = false;
         })
         .catch(err => {
             _fullDataLoading = false;
@@ -242,6 +174,14 @@ function loadFullPlayerData() {
 }
 
 function showFullPlayerModal(nick, discordId) {
+    // Historie se na kit strance nenacita dopredu — dotahni ji az ted a pak
+    // modal prekresli, aby casove achievementy nechybely.
+    const _g = (typeof getActiveGuild === 'function') ? getActiveGuild() : 'czsktiers';
+    if (typeof CZSKData !== 'undefined' && !CZSKData.isHistoryLoaded(_g)) {
+        CZSKData.hydrateHistory(_g, kitPageTierHistory)
+            .then(() => showFullPlayerModal(nick, discordId))
+            .catch(() => {});
+    }
     const modal = document.getElementById('player-modal');
     if (!modal) return;
     
@@ -345,7 +285,7 @@ function showFullPlayerModal(nick, discordId) {
             '</span>' +
             '<span class="tooltiptext">' +
             '<strong>' + origText + '</strong><br>' +
-            (t.peakTierText ? PEAK_TIER_SCORE[t.peakTierText] : t.tier) + ' pts' +
+            ((t.peakTierText && PEAK_TIER_SCORE[t.peakTierText]) || t.tier) + ' pts' +
             (t.peakTierText ? '<br><span style="font-size:0.85em;opacity:0.7;">Peak: ' + t.peakTierText + '</span>' : '') +
             '</span>' +
             '</span>';

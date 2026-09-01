@@ -1,17 +1,25 @@
 // Shared tier utility constants and functions — used by script.js, autocomplete.js
 const TIER_ORDER = ["60","48","32","24","16","10","5","3","2","1","54","43","29","22"];
-const PEAK_TIER_SCORE = { 'HT3': 14, 'LT2': 22, 'HT2': 29, 'LT1': 43, 'HT1': 54 };
+// Skóre "retired" varianty tieru. HT3 tu dřív mělo 14 — hodnotu, která v TIER_ORDER
+// vůbec není, takže getTierOrder('14') vracelo 999 a HT3 peak padal na konec seřazení.
+// Retire z HT3 stejně není možný (bot: RETIREABLE_TIERS), takže tu HT3 nemá co dělat.
+const PEAK_TIER_SCORE = { 'LT2': 22, 'HT2': 29, 'LT1': 43, 'HT1': 54 };
 
 function getTierOrder(tier) {
     const idx = TIER_ORDER.indexOf(String(tier));
     return idx === -1 ? 999 : idx;
 }
 
+// Přijímá "D. M. YYYY" (formát z tabulky) i rovnou ms timestamp, který posílá
+// snapshot z bota — díky tomu obě cesty načítání dat fungují bez rozlišování.
 function parseCzechDate(str) {
-    if (!str) return null;
+    if (str == null || str === '') return null;
+    if (typeof str === 'number') return Number.isFinite(str) ? str : null;
+    if (typeof str !== 'string') return null;
     const m = str.match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/);
-    if (!m) return null;
-    return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1])).getTime();
+    if (m) return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1])).getTime();
+    const n = Number(str);
+    return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function resolveTierValue(tier) {
@@ -80,10 +88,21 @@ function getScoreTitle(score) {
     return { title: 'Nováček', color: '#655B79' };
 }
 
-// Computes the highest confirmed peak tier from a history array.
-// history: [{tier, oldTier, date}] sorted by date ascending.
+// Nejvyšší POTVRZENÝ peak tier z historie.
+//
+// POZOR: tohle je jen ODHAD pro zobrazení na webu. Autoritativní zdroj je bot —
+// ten drží běžící hodiny (peakTierPending / peakTierPendingDate) i kredity za výhry
+// nad stejným tierem (-10 dní za výhru, LT2/HT2 max 3×, LT1/HT1 max 2×), o kterých
+// tabulka TierHistory nic neví. Web proto počítá jen holé dny a bez kreditů —
+// výsledek může být PŘÍSNĚJŠÍ než to, co hráči ukáže /retire.
+//
+// Až bot začne peak publikovat do vlastního sloupce, tahle funkce se má smazat
+// a číst se má rovnou ta hodnota.
+//
+// history: [{tier, oldTier, date}] — pořadí nezáleží, řadí se tu.
 function computePeakTierText(history) {
     if (!history || history.length === 0) return null;
+    // Stejné hodnoty jako PEAK_REQUIRED_DAYS_MAP v botovi.
     const PEAK_REQUIRED_DAYS = { 'HT3': 30, 'LT2': 60, 'HT2': 60, 'LT1': 90, 'HT1': 90 };
     const sorted = history
         .map(e => ({ ...e, ts: parseCzechDate(e.date) }))
@@ -99,23 +118,18 @@ function computePeakTierText(history) {
         if (oldTier === tier) continue;
         const startDate = entry.ts;
         if (!startDate) continue;
+        // Konec úseku = první pozdější záznam, kde hráč z tohoto tieru odešel.
         let endDate = Date.now();
         for (let j = i + 1; j < sorted.length; j++) {
             const next = sorted[j];
-            if (String(next.oldTier || '').trim() === tier && next.ts) {
-                endDate = next.ts;
-                break;
-            }
+            if (String(next.oldTier || '').trim() === tier && next.ts) { endDate = next.ts; break; }
         }
         const heldDays = (endDate - startDate) / (24 * 60 * 60 * 1000);
         if (heldDays >= PEAK_REQUIRED_DAYS[tier]) {
             const tierVal = resolveTierValue(tier);
             if (tierVal) {
                 const order = getTierOrder(tierVal);
-                if (order < confirmedBestOrder) {
-                    confirmedBestOrder = order;
-                    confirmedBestTier = tier;
-                }
+                if (order < confirmedBestOrder) { confirmedBestOrder = order; confirmedBestTier = tier; }
             }
         }
     }

@@ -1161,18 +1161,35 @@ nav ul li { flex-shrink: 0; }
     min-width: 86px; width: max-content; max-width: 150px;
     background: var(--bg-elevated); color: var(--text-primary);
     text-align: center; border-radius: var(--radius-sm);
-    padding: 7px 10px;
+    padding: 6px 10px;
     position: absolute; z-index: 1000;
-    bottom: calc(100% + 8px); left: 50%;
+    /* Těsně nad badge (dřív +8px). Karty v žebříčku jsou nízké, takže
+       s velkou mezerou tooltip vyletěl nad kartu a vypadal, že patří
+       k řádku nad ním. Šipka níž ho navíc vizuálně přilepí k badgi. */
+    bottom: calc(100% + 5px); left: 50%;
     transform: translateX(-50%);
-    opacity: 0; transition: opacity 0.18s;
-    font-size: 0.8em; line-height: 1.45;
+    opacity: 0; transition: opacity 0.14s;
+    font-size: 0.8em; line-height: 1.4;
     box-shadow: var(--shadow-md);
     border: 1px solid var(--border-subtle);
     pointer-events: none;
+    white-space: nowrap;
+}
+/* Šipka směřující dolů na badge */
+.tooltip .tooltiptext::after,
+.kit-badge.tooltip .tooltiptext::after {
+    content: '';
+    position: absolute; top: 100%; left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--bg-elevated);
 }
 .tooltip:hover .tooltiptext,
 .kit-badge.tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+
+/* Hovering a card lifts it above its neighbours, so the tooltip can never be
+   painted underneath the row above it. */
+.player-card:hover, .kit-player-row:hover { z-index: 20; }
 
 /* Old kit-player-row / kit-badges (kit tabulky) */
 .kit-badge-row { display: flex; flex-direction: column; gap: 0; width: 100%; align-items: center; }
@@ -1434,6 +1451,61 @@ nav ul li { flex-shrink: 0; }
     box-shadow: var(--shadow-md); z-index: 10; font-weight: 500;
 }
 .achievement-badge:hover .ach-tip { display: block; }
+
+/* Peak tier / retire progress — hodnoty počítá bot, tady se jen zobrazují */
+.player-modal-peak {
+    padding: 10px 18px 12px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex; flex-direction: column; gap: 8px;
+}
+.peak-title {
+    font-size: 0.68em; font-weight: 800; letter-spacing: 0.8px;
+    text-transform: uppercase; color: var(--text-muted);
+    text-align: center; margin-bottom: 1px;
+}
+.peak-row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
+}
+.peak-kit {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.72em; font-weight: 700; color: var(--text-secondary);
+    flex: 0 0 88px; min-width: 0;
+}
+.peak-kit img { width: 16px; height: 16px; object-fit: contain; flex-shrink: 0; }
+.peak-info {
+    display: flex; flex-direction: column; gap: 4px;
+    flex: 1 1 auto; min-width: 0;
+}
+.peak-locked {
+    font-size: 0.74em; font-weight: 600;
+    color: var(--text-secondary);
+}
+.peak-locked b { color: var(--text-primary); }
+.peak-locked.peak-retire-ok { color: #4ade80; }
+.peak-locked.peak-retire-ok b { color: #4ade80; }
+.peak-pending {
+    font-size: 0.72em; font-weight: 600; color: var(--text-secondary);
+}
+.peak-pending b { color: var(--accent); }
+.peak-bar {
+    display: block; height: 4px; width: 100%;
+    background: rgba(255,255,255,0.07);
+    border-radius: var(--radius-pill); overflow: hidden;
+}
+.peak-bar-fill {
+    display: block; height: 100%;
+    background: linear-gradient(90deg, rgba(var(--accent-rgb),0.55), var(--accent));
+    border-radius: var(--radius-pill);
+    transition: width 0.4s ease;
+}
+@media (max-width: 520px) {
+    .peak-kit { flex-basis: 68px; font-size: 0.66em; }
+    .peak-locked, .peak-pending { font-size: 0.68em; }
+}
 
 /* Actions */
 .player-modal-actions {
@@ -1707,13 +1779,104 @@ nav ul li { flex-shrink: 0; }
 .compare-score.compare-worse  { color: #f87171; }
 
 .compare-summary {
-    padding: 10px 14px; background: var(--bg-surface);
+    padding: 11px 14px; background: var(--bg-surface);
     border-radius: var(--radius-md); font-size: 0.83em;
     color: var(--text-secondary); border: 1px solid var(--border-subtle);
-    display: flex; justify-content: space-around; gap: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.compare-verdict {
+    font-size: 1.02em; font-weight: 700; color: var(--text-primary);
+}
+.compare-verdict strong { color: var(--accent); }
+.compare-meta {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 14px;
+    font-size: 0.86em; color: var(--text-muted);
 }
 .compare-wins { font-weight: 700; color: var(--text-primary); }
 .compare-draw { color: var(--text-muted); }
+.compare-empty {
+    padding: 18px; text-align: center;
+    color: var(--text-muted); font-size: 0.85em;
+}
+/* Hvězdička u tieru, který hráč drží díky zamčenému peaku */
+.compare-peak-star {
+    font-size: 0.75em; margin-left: 3px; vertical-align: top;
+    opacity: 0.75;
+}
+
+/* Vzájemná bilance */
+.compare-h2h {
+    width: 100%; margin-top: 4px; padding-top: 9px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex; flex-direction: column; gap: 6px; align-items: center;
+}
+.compare-h2h-empty { font-size: 0.84em; color: var(--text-muted); text-align: center; }
+.compare-h2h-title { font-size: 0.88em; color: var(--text-secondary); text-align: center; }
+.compare-h2h-title b { color: var(--text-primary); }
+.compare-h2h-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.compare-h2h-row {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bg-card); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-pill); padding: 3px 10px 3px 5px;
+    font-size: 0.76em;
+}
+.compare-h2h-row.h2h-a { border-color: rgba(74,222,128,0.35); }
+.compare-h2h-row.h2h-b { border-color: rgba(248,113,113,0.35); }
+.compare-h2h-kit { width: 15px; height: 15px; object-fit: contain; }
+.compare-h2h-score { font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.compare-h2h-date { color: var(--text-muted); }
+.compare-h2h-more { font-size: 0.74em; color: var(--text-muted); }
+
+/* Průběh testů v Tier Journey */
+.tier-journey-tests { margin-top: 14px; display: flex; flex-direction: column; gap: 5px; }
+.tj-tests-title {
+    font-size: 0.68em; font-weight: 800; letter-spacing: 0.8px;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px;
+}
+.tj-test { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); overflow: hidden; }
+.tj-test.tj-open { border-color: var(--border-accent); }
+.tj-test-head {
+    width: 100%; display: flex; align-items: center; gap: 9px;
+    background: none; border: none; color: inherit; font-family: inherit;
+    padding: 8px 11px; cursor: pointer; text-align: left; font-size: 0.79em;
+}
+.tj-test-head:hover { background: rgba(255,255,255,0.03); }
+.tj-vbadge {
+    width: 19px; height: 19px; flex-shrink: 0; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.62em; font-weight: 800;
+}
+.tj-v-up   { background: rgba(74,222,128,0.16);  color: #4ade80; }
+.tj-v-down { background: rgba(248,113,113,0.16); color: #f87171; }
+.tj-v-same { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
+.tj-v-ret  { background: rgba(238,205,20,0.14);  color: var(--accent); }
+.tj-verdict { font-weight: 700; color: var(--text-primary); }
+.tj-change  { color: var(--text-secondary); }
+.tj-change b { color: var(--text-primary); }
+.tj-date    { margin-left: auto; color: var(--text-muted); font-size: 0.92em; }
+.tj-caret   { color: var(--text-muted); transition: transform 0.18s ease; }
+.tj-open .tj-caret { transform: rotate(90deg); }
+.tj-test-body { padding: 0 11px 9px; }
+.tj-fights { display: flex; flex-direction: column; gap: 4px; }
+.tj-fight {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 9px; border-radius: var(--radius-xs);
+    font-size: 0.78em; background: var(--bg-card);
+    border-left: 3px solid var(--text-muted);
+}
+.tj-fight.tj-win  { border-left-color: #4ade80; }
+.tj-fight.tj-loss { border-left-color: #f87171; }
+.tj-fgroup {
+    font-size: 0.78em; font-weight: 800; letter-spacing: 0.4px;
+    color: var(--text-muted); min-width: 26px;
+}
+.tj-fscore { font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; min-width: 42px; }
+.tj-fopp   { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tj-fres   { margin-left: auto; font-size: 0.9em; color: var(--text-muted); }
+.tj-win .tj-fres  { color: #4ade80; }
+.tj-loss .tj-fres { color: #f87171; }
+.tj-fights-legacy { font-size: 0.78em; color: var(--text-secondary); padding: 6px 2px; }
+.tj-legacy-note { color: var(--text-muted); font-size: 0.9em; margin-top: 3px; }
 
 /* ================================================================
    SCORE GRAPH MODAL

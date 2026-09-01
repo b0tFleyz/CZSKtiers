@@ -8,9 +8,34 @@ function renderKitPage(slug, columnKey) {
     if (container) {
       container.innerHTML = '<div class="loading-indicator"><div class="spinner"></div><p>Načítání dat...</p></div>';
     }
-    getWorkbook()
-      .then(workbook => {
-        const guild = getActiveGuild();
+    const guild = getActiveGuild();
+
+    // Rychlá cesta: snapshot od bota (~74 KB) místo celého XLSX workbooku.
+    // Když chybí, spadne se na původní cestu — stránka se nikdy nerozbije.
+    CZSKData.loadOverall(guild)
+      .then(snap => {
+        players = (snap.players || [])
+          .filter(p => p.nick)
+          .map(p => {
+            const t = p.tiers[columnKey] || {};
+            return {
+              uuid: p.uuid || null,
+              nick: p.nick,
+              discordId: p.id || '',
+              tier: normalizeTier(t.pts != null ? String(t.pts) : undefined)
+            };
+          });
+        renderKitTable(slug, players);
+      })
+      .catch(() => loadKitPageFromWorkbook())
+      .catch(err => {
+        console.error('Error loading kit data:', err);
+        const el = document.getElementById(slug + '-tabulka');
+        if (el) el.innerHTML = '<p style="color:#f66;text-align:center;padding:40px;">Chyba při načítání dat.</p>';
+      });
+
+    function loadKitPageFromWorkbook() {
+      return getWorkbook().then(workbook => {
         const conf = getGuildConf(guild);
         // Pick correct sheet tab
         let worksheet;
@@ -31,12 +56,8 @@ function renderKitPage(slug, columnKey) {
           tier: normalizeTier(row[columnKey])
         }));
         renderKitTable(slug, players);
-      })
-      .catch(err => {
-        console.error('Error loading kit data:', err);
-        const el = document.getElementById(slug + '-tabulka');
-        if (el) el.innerHTML = '<p style="color:#f66;text-align:center;padding:40px;">Chyba při načítání dat.</p>';
       });
+    }
 
     function normalizeTier(val) {
       if (!val) return '';

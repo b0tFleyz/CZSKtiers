@@ -50,6 +50,7 @@
 <span class="player-modal-score-title"></span>
 			</div>
 			<div class="player-modal-tiers"></div>
+        <div class="player-modal-peak" id="player-modal-peak" style="display:none;"></div>
 <div class="player-modal-days" style="display:none;"></div>
 <div class="player-modal-achievements"></div>
 			<div class="player-modal-journey-hint">
@@ -76,6 +77,7 @@
 				</div>
 			</div>
 			<div class="tier-journey-timeline-wrapper"></div>
+			<div class="tier-journey-tests" id="tier-journey-tests"></div>
 			<div class="tier-journey-legend">
 				<span class="journey-legend-item"><span class="journey-legend-dot" style="background:#FFCF4A;"></span>HT1</span>
 				<span class="journey-legend-item"><span class="journey-legend-dot" style="background:#D5B355;"></span>LT1</span>
@@ -87,9 +89,10 @@
 			</div>
 		</div>
 	</div>
-	<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 	<script src="../js/guild-config.js"></script>
 	<script src="../js/tier-utils.js"></script>
+	<script src="../js/data-source.js"></script>
 	<script src="../js/guild-nav.js"></script>
 	<script src="../js/player-count.js"></script>
 	<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -100,6 +103,6 @@
 	<script src="../js/tierjourney.js"></script>
 	<script src="../js/autocomplete.js"></script>
 	<script src="../js/kit-renderer.js"></script>
-	<script src="../js/bed.js"></script>
+	<script>renderKitPage('bed', 'Bed');</script>
 </body>
 </html>
