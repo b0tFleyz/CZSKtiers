@@ -4,6 +4,10 @@ let fullPlayerData = []; // Plná data pro modal
 let kitPageTierHistory = {}; // discordId → kitIcon → [{tier, oldTier}]
 let _fullDataLoading = false;
 
+// Stejna mapa jako na hlavni strance — js/data-source.js do ni dosypava nicky
+// soupreu z history.json, aby se u soubojů neukazovalo "neznamy hrac".
+window.discordIdToNick = window.discordIdToNick || {};
+
 // Tier Journey je sdílený s hlavní stránkou (js/tier-journey-view.js). Dřív měly
 // kit stránky vlastní kopii (js/tierjourney.js), která zaostala — datum ukazovala
 // jako holé číslo, neuměla detail soubojů ani peak pruh a historii si tahala
@@ -370,31 +374,13 @@ function showFullPlayerModal(nick, discordId) {
         .filter(t => t.tier && t.tier !== "-")
         .sort((a, b) => getTierOrder(String(a.tier)) - getTierOrder(String(b.tier)));
 
-    const kitsHtml = sortedTiers.map(t => {
-        const info = tierInfo(String(t.tier));
-        const origText = getOriginalTierText(String(t.tier));
-        const isRetired = origText.startsWith("R");
-        const style = isRetired
-            ? "background:#23242a;color:" + info.barvaTextu + ";"
-            : "background:" + info.barvaPozadi + ";color:#23242a;";
-        const circleColor = isRetired ? "#23242a" : info.barvaPozadi;
-        const tierColor = isRetired ? info.barvaTextu : info.barvaPozadi;
+    // Odznaky kitu vykresluje sdilena CZSKCard (js/player-card.js) — stejny
+    // kod jako hlavni stranka, takze se modaly nemuzou rozejit. Ikony jsou
+    // o slozku vys, proto prefix '../'.
+    const kitsHtml = (typeof CZSKCard !== 'undefined' && CZSKCard.renderTierBadges)
+        ? CZSKCard.renderTierBadges(sortedTiers, { prefix: '../' })
+        : '';
 
-        return '<span class="kit-badge tooltip" style="--tier-color:' + tierColor + ';" data-kit-icon="' + t.icon + '" data-kit-tier="' + t.tier + '">' +
-            '<span class="kit-icon-circle" style="border-color:' + circleColor + ';">' +
-            '<img src="../' + t.icon + '" alt="" class="kit-icon" loading="lazy">' +
-            '</span>' +
-            '<span class="kit-tier-text" style="' + style + '">' +
-            info.novyText +
-            '</span>' +
-            '<span class="tooltiptext">' +
-            '<strong>' + origText + '</strong><br>' +
-            ((t.peakTierText && PEAK_TIER_SCORE[t.peakTierText]) || t.tier) + ' pts' +
-            (t.peakTierText ? '<br><span style="font-size:0.85em;opacity:0.7;">Peak: ' + t.peakTierText + '</span>' : '') +
-            '</span>' +
-            '</span>';
-    }).join('');
-    
     const tiersDiv = modal.querySelector('.player-modal-tiers');
     if (tiersDiv) {
         tiersDiv.innerHTML = kitsHtml;

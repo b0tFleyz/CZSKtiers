@@ -165,11 +165,57 @@
     });
   }
 
+  /**
+   * Odznaky kitů na kartě hráče — JEDNA implementace pro obě stránky.
+   *
+   * Tohle bylo taky dvakrát (script.js a autocomplete.js) a rozdíly se začaly
+   * hromadit: kit stránka nepřidávala `data-kit-tier`, takže se z ní hůř
+   * otevírala Tier Journey, a rozcházelo se i escapování.
+   *
+   * @param tiers        pole { tier, icon, peakTierText, ... }
+   * @param opts.prefix  předpona cesty k ikoně ('../' na kit stránkách)
+   */
+  function renderTierBadges(tiers, opts) {
+    var prefix = (opts && opts.prefix) || '';
+    var esc = function (s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    };
+    var peakScore = (typeof PEAK_TIER_SCORE !== 'undefined') ? PEAK_TIER_SCORE : {};
+
+    return (tiers || []).map(function (t) {
+      var info     = tierInfo(String(t.tier));
+      var origText = getOriginalTierText(String(t.tier));
+      var isR      = origText.charAt(0) === 'R';
+      var style    = isR ? 'background:#23242a;color:' + info.barvaTextu + ';'
+                         : 'background:' + info.barvaPozadi + ';color:#23242a;';
+      var circle   = isR ? '#23242a' : info.barvaPozadi;
+      var tierCol  = isR ? info.barvaTextu : info.barvaPozadi;
+      var pts      = (t.peakTierText && peakScore[t.peakTierText]) || t.tier;
+
+      return '<span class="kit-badge tooltip" style="--tier-color:' + esc(tierCol) + ';"'
+           + ' data-kit-icon="' + esc(t.icon) + '" data-kit-tier="' + esc(t.tier) + '">'
+           +   '<span class="kit-icon-circle" style="border-color:' + esc(circle) + ';">'
+           +     '<img src="' + esc(prefix + t.icon) + '" alt="" class="kit-icon" loading="lazy">'
+           +   '</span>'
+           +   '<span class="kit-tier-text" style="' + style + '">' + info.novyText + '</span>'
+           +   '<span class="tooltiptext">'
+           +     '<strong>' + esc(origText) + '</strong><br>' + esc(pts) + ' pts'
+           +     (t.peakTierText
+                  ? '<br><span style="font-size:0.85em;opacity:0.7;">Peak: ' + esc(t.peakTierText) + '</span>'
+                  : '')
+           +   '</span>'
+           + '</span>';
+    }).join('');
+  }
+
   global.CZSKCard = {
     loadCardSettings: loadCardSettings,
     applyCardSettings: applyCardSettings,
     resetCard: resetCard,
     decorate: decorate,
+    renderTierBadges: renderTierBadges,
     KIT_NAME_TO_ICON: KIT_NAME_TO_ICON
   };
 })(window);

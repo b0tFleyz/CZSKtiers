@@ -87,9 +87,14 @@
       var players = d.players || {};
       // Nicky soupeřů, kteří nejsou v overall.json — bez nich by se u soubojů
       // zobrazovalo jen "neznámý hráč".
-      if (d.nicks && typeof discordIdToNick !== 'undefined') {
+      // Pozor na `global.` — driv se tu sahalo na holy identifikator
+      // discordIdToNick, ktery ale nikdy nebyl globalni (script.js ho ma
+      // schovany v DOMContentLoaded). Podminka tim padem nikdy neprosla
+      // a nicky soupreu se zahazovaly.
+      if (d.nicks) {
+        global.discordIdToNick = global.discordIdToNick || {};
         Object.keys(d.nicks).forEach(function (id) {
-          if (!discordIdToNick[id]) discordIdToNick[id] = d.nicks[id];
+          if (!global.discordIdToNick[id]) global.discordIdToNick[id] = d.nicks[id];
         });
       }
       Object.keys(players).forEach(function (did) {

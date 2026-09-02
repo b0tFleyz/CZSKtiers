@@ -51,6 +51,15 @@
         return map[icon] || icon;
     }
 
+    // Pozor: script.js má vlastní _pEsc, ale je schované uvnitř jeho
+    // DOMContentLoaded callbacku — globálně dostupné NENÍ. Bez téhle kopie
+    // padal peak pruh na "_pEsc is not defined", a to na obou stránkách.
+    function _pEsc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
     function escapeXml(str) {
         return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
@@ -420,7 +429,7 @@
 
     // Zavření modalu (kříž, klik mimo, Esc) — dřív to bylo jen ve script.js,
     // takže na kit stránkách šel modal zavřít hůř.
-    global.addEventListener('DOMContentLoaded', function () {
+    function wireClose() {
         var jm = document.getElementById('tier-journey-modal');
         if (!jm) return;
         var close = jm.querySelector('.tier-journey-close');
@@ -429,5 +438,16 @@
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && jm.style.display === 'flex') jm.style.display = 'none';
         });
-    });
+    }
+
+    // Když se skript načte až po DOMContentLoaded (defer, dynamické vložení),
+    // by se na událost čekalo marně a modal by nešel zavřít. A `document`
+    // nemusí existovat vůbec (testy, server-side) — proto ta kontrola.
+    if (typeof document !== 'undefined') {
+        if (document.readyState === 'loading' && typeof document.addEventListener === 'function') {
+            document.addEventListener('DOMContentLoaded', wireClose);
+        } else {
+            wireClose();
+        }
+    }
 })(window);

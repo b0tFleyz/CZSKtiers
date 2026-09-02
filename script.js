@@ -94,7 +94,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     const kits = (_guild === 'subtiers') ? SUB_KITS : CZSK_KITS;
 
     let overallData = [];
-    let discordIdToNick = {}; // Discord ID → Nick, built from spreadsheet data
+    // Mapa Discord ID -> nick. MUSI byt na window: script.js cely bezi uvnitr
+    // DOMContentLoaded callbacku, takze `let` by zustalo schovane a
+    // js/data-source.js by k ni nedosahl. Prave proto se nicky soupreu
+    // z history.json nikdy nedoplnily a u souboju svitilo "neznamy hrac".
+    window.discordIdToNick = window.discordIdToNick || {};
+    const discordIdToNick = window.discordIdToNick;
     let tierHistory = {}; // keyed by discordId → kitIcon → [{tier, date, note, kit, oldTier}]
 
     // Drzime referenci, at se pri kazdem prekresleni (filtr) nehromadi observery.
@@ -364,32 +369,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     function buildKitBadgesHtml(sortedTiers) {
-        return sortedTiers.map(t => {
-            const info = tierInfo(String(t.tier));
-            const origText = getOriginalTierText(String(t.tier));
-            let style, circleColor;
-            if (origText.startsWith("R")) {
-                style = `background:#23242a;color:${info.barvaTextu};`;
-                circleColor = "#23242a";
-            } else {
-                style = `background:${info.barvaPozadi};color:#23242a;`;
-                circleColor = info.barvaPozadi;
-            }
-            return `
-                    <span class="kit-badge tooltip" data-kit-icon="${t.icon}" style="--tier-color:${origText.startsWith('R') ? info.barvaTextu : info.barvaPozadi};">
-                        <span class="kit-icon-circle" style="border-color:${circleColor};">
-                            <img src="${t.icon}" alt="" class="kit-icon" loading="lazy">
-                        </span>
-                        <span class="kit-tier-text" style="${style}">
-                            ${info.novyText}
-                        </span>
-                        <span class="tooltiptext">
-                            <strong>${origText}</strong><br>
-                            ${(t.peakTierText && PEAK_TIER_SCORE[t.peakTierText]) || t.tier} pts${t.peakTierText ? `<br><span style="font-size:0.85em;opacity:0.7;">Peak: ${t.peakTierText}</span>` : ''}
-                        </span>
-                    </span>
-                `;
-        }).join('');
+        // Odznaky kitu vykresluje sdilena CZSKCard (js/player-card.js) —
+        // stejny kod jako kit stranky.
+        return (typeof CZSKCard !== 'undefined' && CZSKCard.renderTierBadges)
+            ? CZSKCard.renderTierBadges(sortedTiers, {})
+            : '';
     }
 
     function renderOverall(overallData) {
@@ -426,10 +410,13 @@ document.addEventListener('DOMContentLoaded', async function () {
         
         // Připrav všechny kartičky ale nevkládej je do DOMu
         sortedPlayers.forEach((player, idx) => {
+            // Stejné skóre = stejné pořadí. Dřív tu bylo `var rank` v obou
+            // větvích (funguje jen díky hoistingu a lint to hlásí jako chybu).
+            let rank;
             if (player.score === lastScore) {
-                var rank = lastRank;
+                rank = lastRank;
             } else {
-                var rank = idx + 1;
+                rank = idx + 1;
                 lastScore = player.score;
                 lastRank = rank;
             }
