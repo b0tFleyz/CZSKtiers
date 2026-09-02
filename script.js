@@ -994,7 +994,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (Array.isArray(entry.fights) && entry.fights.length) {
             detail = '<div class="tj-fights">' + entry.fights.map(f => {
                 const win  = Number(f.s) > Number(f.os);
-                const nick = _nickOf(f.o);
+                // f.on = nick soupeře, když se ho nepodařilo převést na Discord ID
+                // (starší zprávy psaly soupeře jen jménem). Radši jméno než "neznámý".
+                const nick = _nickOf(f.o) || f.on || null;
                 const who  = nick ? escapeXml(nick) : 'neznámý hráč';
                 const grp  = FIGHT_GROUP_LABEL[f.g] ? '<span class="tj-fgroup">' + FIGHT_GROUP_LABEL[f.g] + '</span>' : '';
                 return '<div class="tj-fight ' + (win ? 'tj-win' : 'tj-loss') + '">' + grp
