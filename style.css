@@ -1827,6 +1827,18 @@ nav ul li { flex-shrink: 0; }
 .compare-h2h-date { color: var(--text-muted); }
 .compare-h2h-more { font-size: 0.74em; color: var(--text-muted); }
 
+/* Peak / retire pruh nahoře v Tier Journey (pod hlavičkou, nad grafem) */
+.tier-journey-peak {
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-surface);
+    border-radius: var(--radius-sm);
+    padding: 9px 13px;
+    margin-bottom: 12px;
+}
+.tier-journey-peak .peak-info { display: flex; flex-direction: column; gap: 5px; }
+.tier-journey-peak .peak-locked,
+.tier-journey-peak .peak-pending { font-size: 0.8em; }
+
 /* Tlačítko zpět z detailu testu na graf */
 .tj-back {
     align-self: flex-start;

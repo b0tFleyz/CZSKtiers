@@ -10,6 +10,30 @@
 (function (global) {
   'use strict';
 
+  // =====================================================================
+  //  PŘEPÍNAČ ZDROJE DAT  — tohle je jediný řádek, který se mění
+  // =====================================================================
+  //  false = ber data z XLSX (Google Sheets)   ← teď
+  //  true  = ber data ze snapshotu od bota     ← až bude historie kompletní
+  //
+  //  Proč zatím XLSX: bot má v tierHistory.json historii jen pro ~68 %
+  //  hráčů (to, co sám zapsal). List TierHistory v tabulce je bohatší,
+  //  protože do něj napadaly i starší výsledky. Než se doplní
+  //  (import-sheet-history.js + backfill-fights.js), je XLSX úplnější.
+  //
+  //  Otestovat druhou cestu bez přepínání souboru:
+  //      ?data=snapshot   nebo   ?data=xlsx      v URL
+  var DEFAULT_USE_SNAPSHOT = false;
+
+  var USE_SNAPSHOT = (function () {
+    try {
+      var q = new URLSearchParams(location.search).get('data');
+      if (q === 'snapshot') return true;
+      if (q === 'xlsx') return false;
+    } catch (e) { /* starý prohlížeč */ }
+    return DEFAULT_USE_SNAPSHOT;
+  })();
+
   var CACHE = { overall: {}, history: {} };
   var HISTORY_LOADED = {};
 
@@ -38,6 +62,12 @@
 
   // --- overall ---------------------------------------------------------
   function loadOverall(guild) {
+    // Vypnuto → tvař se, že snapshot není. Volající (script.js, kit-renderer.js,
+    // autocomplete.js) na to už umí zareagovat pádem zpátky na XLSX.
+    if (!USE_SNAPSHOT) {
+      var e = new Error('snapshot vypnutý'); e.missing = true;
+      return Promise.reject(e);
+    }
     if (CACHE.overall[guild]) return Promise.resolve(CACHE.overall[guild]);
     return fetchJson(dataUrl(guild, 'overall.json')).then(function (d) {
       CACHE.overall[guild] = d;
@@ -50,6 +80,7 @@
   //   target[discordId][kitIcon] = [{ tier, date, note, kit, oldTier, ts, _rowIdx }]
   var _rowIdx = 0;
   function hydrateHistory(guild, target) {
+    if (!USE_SNAPSHOT) return Promise.resolve(target);
     if (HISTORY_LOADED[guild]) return Promise.resolve(target);
     return fetchJson(dataUrl(guild, 'history.json')).then(function (d) {
       var iconByKit = kitIconMap(guild);
@@ -143,6 +174,7 @@
   }
 
   global.CZSKData = {
+    usingSnapshot: function () { return USE_SNAPSHOT; },
     loadOverall: loadOverall,
     hydrateHistory: hydrateHistory,
     toOverallData: toOverallData,

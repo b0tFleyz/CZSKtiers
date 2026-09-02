@@ -44,16 +44,21 @@
 	<!-- Player Modal -->
 	<div id="player-modal" class="player-modal" style="display:none;">
 		<div class="player-modal-content">
+		  <div class="player-modal-banner" id="player-modal-banner"></div>
 			<span class="player-modal-close">&times;</span>
-			<img class="player-modal-skin" src="" alt="skin">
+			<div class="avatar-deco-wrap" id="avatar-deco-wrap">
+			  <img class="player-modal-skin" src="" alt="skin">
+			  <img class="avatar-deco-overlay" id="avatar-deco-overlay" src="" alt="" style="display:none;">
+			</div>
 			<div class="player-modal-name"></div>
+			<div class="player-modal-bio" id="player-modal-bio" style="display:none;"></div>
 			<div class="player-modal-position">
 				<span class="player-modal-rank"></span>
 				<span class="player-modal-score"></span>
 <span class="player-modal-score-title"></span>
 			</div>
+			<div class="player-modal-favkit" id="player-modal-favkit" style="display:none;"></div>
 			<div class="player-modal-tiers"></div>
-        <div class="player-modal-peak" id="player-modal-peak" style="display:none;"></div>
 <div class="player-modal-days" style="display:none;"></div>
 <div class="player-modal-achievements"></div>
 			<div class="player-modal-journey-hint">
@@ -81,7 +86,9 @@
 					<div class="tier-journey-player"></div>
 				</div>
 			</div>
+			<div class="player-modal-peak tier-journey-peak" id="tier-journey-peak" style="display:none;"></div>
 			<div class="tier-journey-timeline-wrapper"></div>
+			<div class="tier-journey-hint">Klikni na tečku v grafu a uvidíš souboje z toho testu</div>
 			<div class="tier-journey-tests" id="tier-journey-tests"></div>
 			<div class="tier-journey-legend">
 				<span class="journey-legend-item"><span class="journey-legend-dot" style="background:#FFCF4A;"></span>HT1</span>
@@ -105,6 +112,7 @@
 	<script src="../js/firebase-config.js"></script>
 	<script>if(typeof FIREBASE_CONFIG!=='undefined'&&FIREBASE_CONFIG.apiKey&&!FIREBASE_CONFIG.apiKey.startsWith('PASTE'))firebase.initializeApp(FIREBASE_CONFIG);</script>
 	<script src="../js/auth.js"></script>
+	<script src="../js/player-card.js"></script>
 	<script src="../js/tierjourney.js"></script>
 	<script src="../js/autocomplete.js"></script>
 	<script src="../js/kit-renderer.js"></script>

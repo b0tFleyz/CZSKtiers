@@ -5,42 +5,13 @@ document.addEventListener('DOMContentLoaded', async function () {
     let currentSuggestionIndex = -1;
     let autocompleteInitialized = false;
 
-    // ===== FIRESTORE CARD SETTINGS =====
-    const _cardSettingsCache = {};
-    function _getFirestore() {
-        try { return firebase.firestore(); } catch { return null; }
-    }
-    async function loadCardSettingsFromFirestore(nick) {
-        if (!nick) return null;
-        const key = nick.toLowerCase();
-        if (_cardSettingsCache[key] !== undefined) return _cardSettingsCache[key];
-        const db = _getFirestore();
-        if (!db) return null;
-        try {
-            const doc = await db.collection('cardSettings').doc(key).get();
-            const data = doc.exists ? doc.data() : null;
-            _cardSettingsCache[key] = data;
-            return data;
-        } catch (e) {
-            console.warn('Firestore load failed:', e);
-            _cardSettingsCache[key] = null;
-            return null;
-        }
-    }
+    // Nastavení a vzhled karty hráče žijí v js/player-card.js (CZSKCard) —
+    // dřív tu byla kopie, kvůli které vypadala karta na kit stránkách jinak.
 
-    // Kit name → icon path map (for favorite kit display)
-    const KIT_NAME_TO_ICON = {
-        'Crystal':'kit_icons/cpvp.png','Axe':'kit_icons/axe.png','Sword':'kit_icons/sword.png',
-        'UHC':'kit_icons/uhc.png','Npot':'kit_icons/npot.png','Pot':'kit_icons/pot.png',
-        'SMP':'kit_icons/smp.png','DiaSMP':'kit_icons/diasmp.png','Mace':'kit_icons/mace.png',
-        'Speed':'kit_icons/speed.png','OGV':'kit_icons/OGV.png','Cart':'kit_icons/cart.png',
-        'Creeper':'kit_icons/creeper.png','DiaVanilla':'kit_icons/diavanilla.png',
-        'Trident':'kit_icons/trident.png','Manhunt':'kit_icons/manhunt.png','Elytra':'kit_icons/elytra.png',
-        'Bow':'kit_icons/bow.png','Bed':'kit_icons/bed.png', 'Debuff':'kit_icons/debuff.png'
-    };
-
-    function getPeakTierTextFromHistory(discordId, kitIcon) {
-        return computePeakTierText((tierHistory[discordId] || {})[kitIcon] || []);
+    // currentTier je potřeba, aby se nedalo "potvrdit" držení tieru, který
+    // hráč dávno nemá a jen k němu chybí záznam o demotu.
+    function getPeakTierTextFromHistory(discordId, kitIcon, currentTier) {
+        return computePeakTierText((tierHistory[discordId] || {})[kitIcon] || [], currentTier);
     }
 
     // Extracts peak tier info from TierHistory worksheet (already in-memory)
@@ -244,12 +215,17 @@ document.addEventListener('DOMContentLoaded', async function () {
             tiers.forEach(t => {
                 const val = parseInt(t.tier);
                 if (!isNaN(val)) {
-                    const peakText = discordId ? getPeakTierTextFromHistory(discordId, t.icon) : null;
+                    // Bez USE_DERIVED_PEAK se skóre bere výhradně z tabulky —
+                    // odvozený peak z neúplné historie jinak hráče neprávem
+                    // vystřelí v žebříčku nahoru (viz komentář v tier-utils.js).
+                    const peakText = (USE_DERIVED_PEAK && discordId)
+                        ? getPeakTierTextFromHistory(discordId, t.icon, getOriginalTierText(String(t.tier)))
+                        : null;
                     const peakScore = peakText ? (PEAK_TIER_SCORE[peakText] || 0) : 0;
-                    const effectiveScore = Math.max(val, peakScore);
-                    overallScore += effectiveScore;
-                    // Only store peakTierText if it actually boosts the score
+                    overallScore += Math.max(val, peakScore);
                     t.peakTierText = (peakScore > val) ? peakText : null;
+                    t.peak = peakText || null;
+                    t.canRetire = !!peakText && ['LT2', 'HT2', 'LT1', 'HT1'].indexOf(peakText) !== -1;
                 }
             });
             // Count current-guild tested kits
@@ -361,70 +337,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Single source of truth for the kit-badge markup shown on cards and in the
     // player modal. Expects tier objects already filtered + sorted by the caller.
-    // === Peak tier / retire progress ==================================
-    // Zdroj pravdy je bot: snapshot posílá u každého kitu `peak` (zamčený peak),
-    // `canRetire` a `pending` (běžící hodiny — dny, potřeba, výhry). Stejná čísla,
-    // jaká hráč vidí v Discordu přes /retire. Tady se nic nepočítá znovu.
-    function renderPeakProgress(el, tiers) {
-        if (!el) return;
-        const rows = (tiers || []).filter(t => t && (t.peak || t.pending));
-        if (rows.length === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
-
-        // Nejzajímavější nahoře: hotové retire, pak rozdělané hodiny podle postupu.
-        rows.sort((a, b) => {
-            const aDone = a.canRetire ? 0 : 1, bDone = b.canRetire ? 0 : 1;
-            if (aDone !== bDone) return aDone - bDone;
-            const ap = a.pending ? a.pending.days / a.pending.required : -1;
-            const bp = b.pending ? b.pending.days / b.pending.required : -1;
-            return bp - ap;
-        });
-
-        const kitName = icon => {
-            const m = String(icon || '').match(/([^/]+)\.png$/i);
-            return m ? m[1].toUpperCase() : '?';
-        };
-
-        const html = rows.map(t => {
-            const name = kitName(t.icon);
-            const parts = [];
-
-            if (t.peak) {
-                parts.push(
-                    '<span class="peak-locked' + (t.canRetire ? ' peak-retire-ok' : '') + '">' +
-                        '\u{1F451} Peak <b>' + _pEsc(t.peak) + '</b>' +
-                        (t.canRetire ? ' \u2014 retire mo\u017En\u00FD' : '') +
-                    '</span>'
-                );
-            }
-
-            if (t.pending) {
-                const p = t.pending;
-                const pct = Math.max(0, Math.min(100, Math.round((p.days / p.required) * 100)));
-                const winNote = p.maxWins > 0
-                    ? ' \u00B7 v\u00FDhry ' + p.wins + '/' + p.maxWins
-                    : '';
-                parts.push(
-                    '<span class="peak-pending">' +
-                        '\u23F3 <b>' + _pEsc(p.tier) + '</b> ' + p.days + '/' + p.required + ' dn\u00ED' +
-                        (p.left > 0 ? ' \u00B7 zb\u00FDv\u00E1 ' + p.left : ' \u00B7 splněno') +
-                        winNote +
-                    '</span>' +
-                    '<span class="peak-bar"><span class="peak-bar-fill" style="width:' + pct + '%"></span></span>'
-                );
-            }
-
-            return '<div class="peak-row">' +
-                       '<span class="peak-kit">' +
-                           '<img src="' + _pEsc(t.icon) + '" alt="" loading="lazy">' + _pEsc(name) +
-                       '</span>' +
-                       '<span class="peak-info">' + parts.join('') + '</span>' +
-                   '</div>';
-        }).join('');
-
-        el.innerHTML = '<div class="peak-title">Peak tier a retire</div>' + html;
-        el.style.display = '';
-    }
-
     function _pEsc(s) {
         return String(s == null ? '' : s)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -844,21 +756,20 @@ document.addEventListener('DOMContentLoaded', async function () {
         const parts = [];
         if (tierEntry.peak) {
             parts.push('<span class="peak-locked' + (tierEntry.canRetire ? ' peak-retire-ok' : '') + '">'
-                + '\u{1F451} Peak <b>' + _pEsc(tierEntry.peak) + '</b>'
-                + (tierEntry.canRetire ? ' \u2014 retire mo\u017En\u00FD' : '') + '</span>');
+                + 'Peak <b>' + _pEsc(tierEntry.peak) + '</b>'
+                + (tierEntry.canRetire ? ' \u00B7 retire mo\u017En\u00FD' : '') + '</span>');
         }
         if (tierEntry.pending) {
             const p = tierEntry.pending;
             const pct = Math.max(0, Math.min(100, Math.round((p.days / p.required) * 100)));
-            parts.push('<span class="peak-pending">\u23F3 <b>' + _pEsc(p.tier) + '</b> '
+            parts.push('<span class="peak-pending"><b>' + _pEsc(p.tier) + '</b> '
                 + p.days + '/' + p.required + ' dn\u00ED'
                 + (p.left > 0 ? ' \u00B7 zb\u00FDv\u00E1 ' + p.left : ' \u00B7 splněno')
                 + (p.maxWins > 0 ? ' \u00B7 v\u00FDhry ' + p.wins + '/' + p.maxWins : '')
                 + '</span>'
                 + '<span class="peak-bar"><span class="peak-bar-fill" style="width:' + pct + '%"></span></span>');
         }
-        container.innerHTML = '<div class="peak-title">Peak tier a retire</div>'
-                            + '<div class="peak-row"><span class="peak-info">' + parts.join('') + '</span></div>';
+        container.innerHTML = '<span class="peak-info">' + parts.join('') + '</span>';
         container.style.display = '';
     }
 
@@ -1173,110 +1084,21 @@ document.addEventListener('DOMContentLoaded', async function () {
         content.classList.add('modal-loading');
         modal.style.display = 'flex';
 
-        // Reset decoration, name effect, theme
-        if (decoWrap) { decoWrap.removeAttribute('data-deco'); }
-        const decoOverlay = modal.querySelector('#avatar-deco-overlay');
-        if (decoOverlay) { decoOverlay.style.display = 'none'; decoOverlay.src = ''; }
-        nameEl.className = 'player-modal-name';
-        content.className = 'player-modal-content modal-loading';
-        content.removeAttribute('data-theme');
-
-        // Reset customization defaults
-        banner.style.display = 'none';
-        bioEl.style.display = 'none';
-        nameEl.style.color = '';
-        content.style.borderColor = '';
-        if (favkitEl) favkitEl.style.display = 'none';
-
-        // Load card settings — try Firestore first (public for any player), fallback to localStorage for own card
+        // Vzhled karty řeší sdílený modul js/player-card.js — dřív tu byla
+        // vlastní kopie a karta na kit stránkách proto vypadala jinak.
         let cardSettings = null;
         const playerNick = nick || name || '';
         try {
-            cardSettings = await loadCardSettingsFromFirestore(playerNick);
-        } catch { /* ignore */ }
+          cardSettings = await CZSKCard.loadCardSettings(playerNick);
+        } catch (e) { /* Firestore nedostupné */ }
         if (!cardSettings) {
-            const auth = window.CZSKAuth && CZSKAuth.getCurrentUser();
-            const isMyCard = auth && auth.nick && auth.nick.toLowerCase() === playerNick.toLowerCase();
-            if (isMyCard) {
-                cardSettings = getMyCardSettings();
-            }
+          const auth = window.CZSKAuth && CZSKAuth.getCurrentUser();
+          const isMyCard = auth && auth.nick && auth.nick.toLowerCase() === playerNick.toLowerCase();
+          if (isMyCard) cardSettings = getMyCardSettings();
         }
-
-        // Apply card customizations (for any player now)
-        if (cardSettings) {
-            if (cardSettings.banner) {
-                const bannerVal = String(cardSettings.banner);
-                if (!/url\s*\(/i.test(bannerVal)) {
-                    banner.style.background = bannerVal;
-                    banner.style.display = '';
-                }
-            }
-            if (cardSettings.accent) {
-                const accentVal = String(cardSettings.accent).trim();
-                if (/^#[0-9a-f]{3,8}$/i.test(accentVal) || /^rgba?\s*\(/i.test(accentVal)) {
-                    nameEl.style.color = accentVal;
-                    content.style.borderColor = accentVal + '33';
-                }
-            }
-            if (cardSettings.bio) {
-                bioEl.textContent = cardSettings.bio;
-                bioEl.style.display = '';
-            }
-            if (favkitEl && cardSettings.favoriteKit) {
-                const kitIcon = KIT_NAME_TO_ICON[cardSettings.favoriteKit] || '';
-                favkitEl.innerHTML = '';
-                const lbl = document.createElement('span');
-                lbl.className = 'favkit-label';
-                lbl.textContent = 'Oblíbený kit:';
-                favkitEl.appendChild(lbl);
-                favkitEl.appendChild(document.createTextNode(' '));
-                if (kitIcon) {
-                    const img = document.createElement('img');
-                    img.className = 'favkit-icon';
-                    img.src = kitIcon;
-                    img.alt = '';
-                    favkitEl.appendChild(img);
-                }
-                const val = document.createElement('span');
-                val.className = 'favkit-value';
-                val.textContent = cardSettings.favoriteKit;
-                const accentVal = String(cardSettings.accent || '').trim();
-                if (accentVal && (/^#[0-9a-f]{3,8}$/i.test(accentVal) || /^rgba?\s*\(/i.test(accentVal))) {
-                    val.style.color = accentVal;
-                }
-                favkitEl.appendChild(val);
-                favkitEl.style.display = '';
-            }
-            // Apply avatar decoration (image overlay + glow)
-            if (decoWrap && cardSettings.decoration) {
-                const safeDecoName = String(cardSettings.decoration).replace(/[^a-zA-Z0-9_-]/g, '');
-                if (safeDecoName) {
-                    decoWrap.setAttribute('data-deco', safeDecoName);
-                    if (decoOverlay) {
-                        decoOverlay.src = 'decorations/' + safeDecoName + '.png';
-                        decoOverlay.style.display = '';
-                        decoOverlay.onerror = () => { decoOverlay.style.display = 'none'; };
-                    }
-                }
-            }
-            // Apply name effect — whitelist only known values
-            if (cardSettings.nameEffect) {
-                const ALLOWED_EFFECTS = ['gradient', 'rainbow', 'glitch', 'glow', 'typewriter'];
-                if (ALLOWED_EFFECTS.includes(cardSettings.nameEffect)) {
-                    nameEl.classList.add('name-effect-' + cardSettings.nameEffect);
-                    if (cardSettings.nameEffect === 'gradient' || cardSettings.nameEffect === 'rainbow') {
-                        nameEl.style.color = '';
-                    }
-                }
-            }
-            // Apply profile theme — whitelist only known values
-            if (cardSettings.theme) {
-                const ALLOWED_THEMES = ['neon', 'dark', 'retro', 'minecraft'];
-                if (ALLOWED_THEMES.includes(cardSettings.theme)) {
-                    content.setAttribute('data-theme', cardSettings.theme);
-                }
-            }
-        }
+        CZSKCard.resetCard(modal);
+        content.className = 'player-modal-content modal-loading';
+        CZSKCard.applyCardSettings(modal, cardSettings);
 
         // Set player name
         nameEl.textContent = name;
@@ -1351,11 +1173,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                 achEl.style.display = 'none';
             }
         }
-
-        // Peak tier / retire progress — data počítá bot (viz bot/publish-snapshot.js),
-        // takže tady se jen vykresluje. Ve fallback režimu (XLSX) tahle pole chybí
-        // a sekce se prostě nezobrazí.
-        renderPeakProgress(modal.querySelector('#player-modal-peak'), tiers);
 
         // Remove loading state — reveal content
         content.classList.remove('modal-loading');
@@ -2047,7 +1864,8 @@ document.addEventListener('DOMContentLoaded', async function () {
                 return ts !== null && ts !== undefined && ts <= atTs;
             });
             if (!eventsUpToTs.length) return 0;
-            const peakText = computePeakTierText(eventsUpToTs);
+            // třetí parametr = počítej peak k tomuto datu, ne k dnešku
+            const peakText = computePeakTierText(eventsUpToTs, null, atTs);
             return (peakText && PEAK_TIER_SCORE[peakText]) ? PEAK_TIER_SCORE[peakText] : 0;
         }
 

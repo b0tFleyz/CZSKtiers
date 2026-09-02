@@ -102,7 +102,6 @@
         <div class="player-modal-days" style="display:none;"></div>
         <div class="player-modal-favkit" id="player-modal-favkit" style="display:none;"></div>
         <div class="player-modal-tiers"></div>
-        <div class="player-modal-peak" id="player-modal-peak" style="display:none;"></div>
         <div class="player-modal-achievements"></div>
         <div class="player-modal-actions">
           <button class="compare-btn" id="compare-btn">
@@ -170,8 +169,8 @@
             <div class="tier-journey-player"></div>
           </div>
         </div>
-        <div class="tier-journey-timeline-wrapper"></div>
         <div class="player-modal-peak tier-journey-peak" id="tier-journey-peak" style="display:none;"></div>
+        <div class="tier-journey-timeline-wrapper"></div>
         <div class="tier-journey-hint">Klikni na tečku v grafu a uvidíš souboje z toho testu</div>
         <div class="tier-journey-tests" id="tier-journey-tests"></div>
         <div class="tier-journey-legend">
@@ -227,6 +226,7 @@
     <script src="js/firebase-config.js"></script>
     <script>if(typeof FIREBASE_CONFIG!=='undefined'&&FIREBASE_CONFIG.apiKey&&!FIREBASE_CONFIG.apiKey.startsWith('PASTE'))firebase.initializeApp(FIREBASE_CONFIG);</script>
     <script src="js/auth.js"></script>
+    <script src="js/player-card.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

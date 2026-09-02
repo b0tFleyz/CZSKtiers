@@ -8,8 +8,8 @@ function _escHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function getPeakTierTextAC(discordId, kitIcon) {
-    return computePeakTierText((kitPageTierHistory[discordId] || {})[kitIcon] || []);
+function getPeakTierTextAC(discordId, kitIcon, currentTier) {
+    return computePeakTierText((kitPageTierHistory[discordId] || {})[kitIcon] || [], currentTier);
 }
 
 function initAutocomplete(players) {
@@ -220,7 +220,9 @@ function loadFullPlayerDataFromWorkbook() {
                     const val = row[key];
                     if (!val || val === '-' || val === 'N/A') return;
                     const num = parseFloat(val);
-                    const peakText = discordId ? getPeakTierTextAC(discordId, iconByKit[key]) : null;
+                    const peakText = (USE_DERIVED_PEAK && discordId)
+                        ? getPeakTierTextAC(discordId, iconByKit[key], getOriginalTierText(String(val)))
+                        : null;
                     const peakScore = peakText ? (PEAK_TIER_SCORE[peakText] || 0) : 0;
                     if (!isNaN(num)) score += Math.max(num, peakScore);
                     tiers.push({
@@ -283,6 +285,12 @@ function showFullPlayerModal(nick, discordId) {
         lastRank = currentRank;
     }
     
+    // Vzhled karty (banner, bio, oblíbený kit, dekorace) — stejný modul jako
+    // na hlavní stránce, takže obě karty vypadají identicky.
+    if (typeof CZSKCard !== 'undefined') {
+      CZSKCard.decorate(modal, player.nick).catch(function () {});
+    }
+
     // Nastav data
     modal.querySelector('.player-modal-name').textContent = player.nick;
     modal.querySelector('.player-modal-score').textContent = player.score + ' points';

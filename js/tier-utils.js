@@ -1,4 +1,22 @@
 // Shared tier utility constants and functions — used by script.js, autocomplete.js
+
+// =====================================================================
+//  PEAK TIER Z HISTORIE  (dočasné řešení, než se přejde na databázi)
+// =====================================================================
+//  Hráč, který si tier odsloužil, má za něj body i po demotu — skóre je
+//  max(aktuální tier, peak). Peak se zatím odvozuje z listu TierHistory.
+//
+//  POZOR na past: dřív se konec držení tieru hledal jen podle záznamu,
+//  kde oldTier === tier. Když takový záznam chyběl (a v datech často
+//  chybí), skript usoudil, že hráč tier drží DODNES — a potvrdil peak,
+//  který nikdy nenastal. Hráči pak skákali v žebříčku nahoru.
+//
+//  computePeakTierText() proto bere i AKTUÁLNÍ tier hráče a používá
+//  konzervativnější pravidlo (viz komentáře uvnitř funkce).
+//
+//  Až se web přepne na snapshot (DEFAULT_USE_SNAPSHOT v js/data-source.js),
+//  peak počítá bot ze svých hodin a tenhle odhad zmizí.
+var USE_DERIVED_PEAK = true;
 const TIER_ORDER = ["60","48","32","24","16","10","5","3","2","1","54","43","29","22"];
 // Skóre "retired" varianty tieru. HT3 tu dřív mělo 14 — hodnotu, která v TIER_ORDER
 // vůbec není, takže getTierOrder('14') vracelo 999 a HT3 peak padal na konec seřazení.
@@ -88,50 +106,73 @@ function getScoreTitle(score) {
     return { title: 'Nováček', color: '#655B79' };
 }
 
-// Nejvyšší POTVRZENÝ peak tier z historie.
+// Nejvyšší peak tier, který hráč podle historie skutečně odsloužil.
 //
-// POZOR: tohle je jen ODHAD pro zobrazení na webu. Autoritativní zdroj je bot —
-// ten drží běžící hodiny (peakTierPending / peakTierPendingDate) i kredity za výhry
-// nad stejným tierem (-10 dní za výhru, LT2/HT2 max 3×, LT1/HT1 max 2×), o kterých
-// tabulka TierHistory nic neví. Web proto počítá jen holé dny a bez kreditů —
-// výsledek může být PŘÍSNĚJŠÍ než to, co hráči ukáže /retire.
-//
-// Až bot začne peak publikovat do vlastního sloupce, tahle funkce se má smazat
-// a číst se má rovnou ta hodnota.
-//
-// history: [{tier, oldTier, date}] — pořadí nezáleží, řadí se tu.
-function computePeakTierText(history) {
+// history:      [{tier, oldTier, date}] pro JEDEN kit
+// currentTier:  aktuální tier hráče v tom kitu ("HT2", "LT3", …) — nepovinné,
+//               ale bez něj se nedá poznat, jestli tier pořád drží
+// asOfTs:       nepovinné — počítej peak "k tomuhle datu" (stroj času, rank history).
+//               V tomhle režimu je konec nedokončeného úseku právě asOfTs; do té
+//               doby totiž žádná změna zaznamenaná není, což je platný důkaz držení.
+function computePeakTierText(history, currentTier, asOfTs) {
     if (!history || history.length === 0) return null;
-    // Stejné hodnoty jako PEAK_REQUIRED_DAYS_MAP v botovi.
     const PEAK_REQUIRED_DAYS = { 'HT3': 30, 'LT2': 60, 'HT2': 60, 'LT1': 90, 'HT1': 90 };
+
     const sorted = history
         .map(e => ({ ...e, ts: parseCzechDate(e.date) }))
-        .sort((a, b) => (a.ts || 0) - (b.ts || 0));
-    let confirmedBestOrder = 999;
-    let confirmedBestTier = null;
+        .filter(e => e.ts)
+        .sort((a, b) => a.ts - b.ts);
+    if (!sorted.length) return null;
+
+    const lastKnown = sorted[sorted.length - 1].ts;
+    const historical = (typeof asOfTs === 'number' && isFinite(asOfTs));
+    const nowTs = historical ? asOfTs : Date.now();
+    const cur = String(currentTier || '').trim().replace(/^R/, '');
+
+    let bestOrder = 999, best = null;
+
     for (let i = 0; i < sorted.length; i++) {
-        const entry = sorted[i];
-        const tier = String(entry.tier || '').trim();
+        const tier = String(sorted[i].tier || '').trim();
         if (!tier || tier.startsWith('R')) continue;
         if (!PEAK_REQUIRED_DAYS[tier]) continue;
-        const oldTier = String(entry.oldTier || '').trim();
-        if (oldTier === tier) continue;
-        const startDate = entry.ts;
-        if (!startDate) continue;
-        // Konec úseku = první pozdější záznam, kde hráč z tohoto tieru odešel.
-        let endDate = Date.now();
+        if (String(sorted[i].oldTier || '').trim() === tier) continue;  // beze změny
+
+        const startDate = sorted[i].ts;
+
+        // Konec držení = první POZDĚJŠÍ záznam, který ukazuje JINÝ tier.
+        // (Dřív se hledal jen záznam s oldTier === tier; ten ale často chybí.)
+        let endDate = null;
         for (let j = i + 1; j < sorted.length; j++) {
-            const next = sorted[j];
-            if (String(next.oldTier || '').trim() === tier && next.ts) { endDate = next.ts; break; }
+            const nextTier = String(sorted[j].tier || '').trim();
+            const nextOld  = String(sorted[j].oldTier || '').trim();
+            if (nextOld === tier || (nextTier && nextTier !== tier)) { endDate = sorted[j].ts; break; }
         }
+
+        if (endDate === null) {
+            // Žádný pozdější záznam o změně. Dvě možnosti:
+            if (cur === tier || historical) {
+                // Drží ho dodnes, nebo se ptáme na konkrétní datum a do něj
+                // žádná změna nepřišla — obojí je doložené držení.
+                endDate = nowTs;
+            } else if (cur) {
+                // Hráč je dnes JINDE, ale odchod není zaznamenaný. Nevíme kdy
+                // odešel, takže nejzazší doložený okamžik je poslední záznam
+                // v historii — dál si nic vymýšlet nebudeme.
+                endDate = lastKnown;
+            } else {
+                // Aktuální tier neznáme; bez něj by "dodnes" byla čirá domněnka.
+                endDate = lastKnown;
+            }
+        }
+
         const heldDays = (endDate - startDate) / (24 * 60 * 60 * 1000);
         if (heldDays >= PEAK_REQUIRED_DAYS[tier]) {
-            const tierVal = resolveTierValue(tier);
-            if (tierVal) {
-                const order = getTierOrder(tierVal);
-                if (order < confirmedBestOrder) { confirmedBestOrder = order; confirmedBestTier = tier; }
+            const val = resolveTierValue(tier);
+            if (val) {
+                const order = getTierOrder(val);
+                if (order < bestOrder) { bestOrder = order; best = tier; }
             }
         }
     }
-    return confirmedBestTier;
+    return best;
 }
