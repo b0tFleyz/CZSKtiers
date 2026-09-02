@@ -1827,6 +1827,18 @@ nav ul li { flex-shrink: 0; }
 .compare-h2h-date { color: var(--text-muted); }
 .compare-h2h-more { font-size: 0.74em; color: var(--text-muted); }
 
+/* Tlačítko zpět z detailu testu na graf */
+.tj-back {
+    align-self: flex-start;
+    background: var(--bg-surface); color: var(--text-secondary);
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-pill);
+    padding: 5px 13px; font-size: 0.76em; font-weight: 700; font-family: inherit;
+    cursor: pointer; margin-bottom: 8px;
+}
+.tj-back:hover { color: var(--text-primary); border-color: var(--border-accent); }
+/* Peak pruh uvnitř Tier Journey — bez horní linky, ta už je od grafu */
+.tier-journey-peak { border-top: none; padding-top: 4px; }
+
 /* Průběh testů v Tier Journey */
 .tier-journey-tests { margin-top: 12px; display: flex; flex-direction: column; gap: 5px; }
 /* Detail jednoho testu — rozbalí se po kliknutí na tečku v grafu */

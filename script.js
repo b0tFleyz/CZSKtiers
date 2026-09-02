@@ -325,7 +325,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         } catch (snapErr) {
             // Snapshot ještě neexistuje (bot neběžel) — spadni na starou cestu,
             // ať se stránka nikdy nerozbije kvůli chybějícím datům.
-            console.warn('[data] snapshot nedostupný, načítám XLSX:', snapErr.message);
+            console.info(CZSKData.usingSnapshot()
+                ? '[data] snapshot nedostupný, načítám XLSX: ' + snapErr.message
+                : '[data] zdroj: XLSX (snapshot vypnutý v js/data-source.js)');
             _usingSnapshot = false;
             await nactiOverallExcel();
         }
@@ -825,6 +827,41 @@ document.addEventListener('DOMContentLoaded', async function () {
         { label:'HT5', val:'2'  }, { label:'LT5', val:'1'  }
     ];
 
+    // Datum k zobrazení — zvládne ms timestamp i starý "D. M. YYYY" řetězec.
+    function _journeyDateLabel(h) {
+        const ts = h.ts || (typeof h.date === 'number' ? h.date : parseCzechDate(h.date));
+        if (ts) return new Date(ts).toLocaleDateString('cs-CZ');
+        return typeof h.date === 'string' ? h.date : '';
+    }
+
+    // Peak / retire pruh pro JEDEN kit — stejná data jako na kartě hráče,
+    // jen zúžená na kit, jehož journey je zrovna otevřená.
+    function renderJourneyPeak(container, tierEntry) {
+        if (!container) return;
+        if (!tierEntry || (!tierEntry.peak && !tierEntry.pending)) {
+            container.innerHTML = ''; container.style.display = 'none'; return;
+        }
+        const parts = [];
+        if (tierEntry.peak) {
+            parts.push('<span class="peak-locked' + (tierEntry.canRetire ? ' peak-retire-ok' : '') + '">'
+                + '\u{1F451} Peak <b>' + _pEsc(tierEntry.peak) + '</b>'
+                + (tierEntry.canRetire ? ' \u2014 retire mo\u017En\u00FD' : '') + '</span>');
+        }
+        if (tierEntry.pending) {
+            const p = tierEntry.pending;
+            const pct = Math.max(0, Math.min(100, Math.round((p.days / p.required) * 100)));
+            parts.push('<span class="peak-pending">\u23F3 <b>' + _pEsc(p.tier) + '</b> '
+                + p.days + '/' + p.required + ' dn\u00ED'
+                + (p.left > 0 ? ' \u00B7 zb\u00FDv\u00E1 ' + p.left : ' \u00B7 splněno')
+                + (p.maxWins > 0 ? ' \u00B7 v\u00FDhry ' + p.wins + '/' + p.maxWins : '')
+                + '</span>'
+                + '<span class="peak-bar"><span class="peak-bar-fill" style="width:' + pct + '%"></span></span>');
+        }
+        container.innerHTML = '<div class="peak-title">Peak tier a retire</div>'
+                            + '<div class="peak-row"><span class="peak-info">' + parts.join('') + '</span></div>';
+        container.style.display = '';
+    }
+
     function renderTierJourneyTimeline(container, history) {
         container.innerHTML = '';
 
@@ -868,8 +905,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         // X-axis date labels
         history.forEach((h, i) => {
             const x = xFor(i, history.length);
-            if (h.date) {
-                svg += `<text x="${x}" y="${SVG_H - 6}" text-anchor="middle" font-family="Poppins,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.38)">${escapeXml(h.date)}</text>`;
+            // h.date je od snapshotu ms timestamp (dřív to byl český datumový
+            // řetězec) — bez formátování se na ose vypsalo holé číslo.
+            const label = _journeyDateLabel(h);
+            if (label) {
+                svg += `<text x="${x}" y="${SVG_H - 6}" text-anchor="middle" font-family="Poppins,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.38)">${escapeXml(label)}</text>`;
             }
         });
 
@@ -927,10 +967,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             circle.addEventListener('click', function (e) {
                 e.stopPropagation();
                 const i = parseInt(this.getAttribute('data-i'));
-                const modal = document.getElementById('tier-journey-modal');
-                renderSingleTest(modal && modal.querySelector('#tier-journey-tests'), history[i], i);
-                svgEl.querySelectorAll('.journey-hit').forEach(c => c.classList.remove('journey-selected'));
-                if (_openTestIdx === i) this.classList.add('journey-selected');
+                showJourneyTest(history[i]);
             });
         });
 
@@ -1000,32 +1037,27 @@ document.addEventListener('DOMContentLoaded', async function () {
         return discordIdToNick[discordId] || null;
     }
 
-    // === Detail jednoho testu (po kliknutí na bod v grafu) ==============
-    // Dřív se pod grafem vypisoval celý seznam testů. Teď je skrytý a rozbalí
-    // se jen ten test, na jehož tečku uživatel klikne — graf je tím pádem
-    // hlavní ovládací prvek a modal nekyne do délky.
-    let _openTestIdx = null;
+    // Detail jednoho testu — místo dalšího modalu přepneme obsah toho otevřeného.
+    // Vrstvit modaly na sebe je na mobilu nepoužitelné.
+    function showJourneyTest(entry) {
+        const modal = document.getElementById('tier-journey-modal');
+        if (!modal || !entry) return;
+        const graph = modal.querySelector('.tier-journey-timeline-wrapper');
+        const hint  = modal.querySelector('.tier-journey-hint');
+        const peak  = modal.querySelector('#tier-journey-peak');
+        const view  = modal.querySelector('#tier-journey-tests');
+        const legend = modal.querySelector('.tier-journey-legend');
+        if (!view) return;
 
-    function renderSingleTest(container, entry, idx) {
-        if (!container) return;
+        [graph, hint, peak, legend].forEach(el => { if (el) el.style.display = 'none'; });
 
-        // Druhé kliknutí na stejnou tečku detail zase zavře.
-        if (_openTestIdx === idx) {
-            _openTestIdx = null;
-            container.innerHTML = '';
-            container.style.display = 'none';
-            return;
-        }
-        _openTestIdx = idx;
-
-        const vs = VERDICT_STYLE[entry.note] || { cls: 'tj-v-same', icon: '\u25CF' };
-        const when = entry.ts ? new Date(entry.ts).toLocaleDateString('cs-CZ')
-                              : (entry.date || '');
+        const vs   = VERDICT_STYLE[entry.note] || { cls: 'tj-v-same', icon: '\u25CF' };
+        const when = _journeyDateLabel(entry);
         const tierNow = entry.tier ? getOriginalTierText(resolveTierValue(entry.tier) || '') : '';
         const tierOld = entry.oldTier ? getOriginalTierText(resolveTierValue(entry.oldTier) || '') : '';
         const change = (tierOld && tierOld !== '-' && tierOld !== tierNow)
-            ? `${escapeXml(tierOld)} \u2192 <b>${escapeXml(tierNow)}</b>`
-            : `<b>${escapeXml(tierNow || entry.tier || '')}</b>`;
+            ? escapeXml(tierOld) + ' \u2192 <b>' + escapeXml(tierNow) + '</b>'
+            : '<b>' + escapeXml(tierNow || entry.tier || '') + '</b>';
 
         let detail;
         if (Array.isArray(entry.fights) && entry.fights.length) {
@@ -1033,99 +1065,37 @@ document.addEventListener('DOMContentLoaded', async function () {
                 const win  = Number(f.s) > Number(f.os);
                 const nick = _nickOf(f.o);
                 const who  = nick ? escapeXml(nick) : 'neznámý hráč';
-                const grp  = FIGHT_GROUP_LABEL[f.g]
-                    ? `<span class="tj-fgroup">${FIGHT_GROUP_LABEL[f.g]}</span>` : '';
-                return `<div class="tj-fight ${win ? 'tj-win' : 'tj-loss'}">
-                            ${grp}
-                            <span class="tj-fscore">${Number(f.s)}\u2013${Number(f.os)}</span>
-                            <span class="tj-fopp">${who}</span>
-                            <span class="tj-fres">${win ? 'výhra' : 'prohra'}</span>
-                        </div>`;
+                const grp  = FIGHT_GROUP_LABEL[f.g] ? '<span class="tj-fgroup">' + FIGHT_GROUP_LABEL[f.g] + '</span>' : '';
+                return '<div class="tj-fight ' + (win ? 'tj-win' : 'tj-loss') + '">' + grp
+                     + '<span class="tj-fscore">' + Number(f.s) + '\u2013' + Number(f.os) + '</span>'
+                     + '<span class="tj-fopp">' + who + '</span>'
+                     + '<span class="tj-fres">' + (win ? 'výhra' : 'prohra') + '</span></div>';
             }).join('') + '</div>';
         } else if (Array.isArray(entry.opponents) && entry.opponents.length) {
-            const names = entry.opponents.map(id => escapeXml(_nickOf(id) || id)).join(', ');
-            detail = `<div class="tj-fights tj-fights-legacy">Soupeři: ${names}
-                      <div class="tj-legacy-note">U tohoto testu nejsou uložená skóre.</div></div>`;
+            detail = '<div class="tj-fights tj-fights-legacy">Soupeři: '
+                   + entry.opponents.map(id => escapeXml(_nickOf(id) || id)).join(', ')
+                   + '<div class="tj-legacy-note">U tohoto testu nejsou uložená skóre.</div></div>';
         } else {
-            detail = `<div class="tj-fights tj-fights-legacy">
-                        Detail soubojů není uložený.
-                        <div class="tj-legacy-note">Starší testy skóre neukládaly.</div>
-                      </div>`;
+            detail = '<div class="tj-fights tj-fights-legacy">Detail soubojů není uložený.'
+                   + '<div class="tj-legacy-note">Starší testy skóre neukládaly.</div></div>';
         }
 
-        container.innerHTML =
-            `<div class="tj-test tj-open tj-single">
-                 <div class="tj-test-head tj-test-head-static">
-                     <span class="tj-vbadge ${vs.cls}">${vs.icon}</span>
-                     <span class="tj-verdict">${escapeXml(entry.note || '')}</span>
-                     <span class="tj-change">${change}</span>
-                     <span class="tj-date">${escapeXml(when)}</span>
-                 </div>
-                 <div class="tj-test-body">${detail}</div>
-             </div>`;
-        container.style.display = '';
-    }
+        view.innerHTML =
+            '<button class="tj-back" type="button">\u2039 Zpět na graf</button>'
+          + '<div class="tj-test tj-open tj-single">'
+          +   '<div class="tj-test-head tj-test-head-static">'
+          +     '<span class="tj-vbadge ' + vs.cls + '">' + vs.icon + '</span>'
+          +     '<span class="tj-verdict">' + escapeXml(entry.note || '') + '</span>'
+          +     '<span class="tj-change">' + change + '</span>'
+          +     '<span class="tj-date">' + escapeXml(when) + '</span>'
+          +   '</div>'
+          +   '<div class="tj-test-body">' + detail + '</div>'
+          + '</div>';
+        view.style.display = '';
 
-    function renderTestList(container, history) {
-        if (!container) return;
-        // Nejnovější nahoře — lidi zajímá poslední test, ne ten z roku 2023.
-        const rows = [...history].sort((a, b) => (b.ts || 0) - (a.ts || 0));
-        if (rows.length === 0) { container.innerHTML = ''; container.style.display = 'none'; return; }
-
-        const html = rows.map((h, idx) => {
-            const vs = VERDICT_STYLE[h.note] || { cls: 'tj-v-same', icon: '\u25CF' };
-            const when = h.ts ? new Date(h.ts).toLocaleDateString('cs-CZ') : '';
-            const tierNow = h.tier ? getOriginalTierText(resolveTierValue(h.tier) || '') : '';
-            const tierOld = h.oldTier ? getOriginalTierText(resolveTierValue(h.oldTier) || '') : '';
-            const change = (tierOld && tierOld !== '-' && tierOld !== tierNow)
-                ? `${escapeXml(tierOld)} \u2192 <b>${escapeXml(tierNow)}</b>`
-                : `<b>${escapeXml(tierNow || h.tier || '')}</b>`;
-
-            let detail = '';
-            if (Array.isArray(h.fights) && h.fights.length) {
-                detail = '<div class="tj-fights">' + h.fights.map(f => {
-                    const win = Number(f.s) > Number(f.os);
-                    const nick = _nickOf(f.o);
-                    const who = nick ? escapeXml(nick) : 'neznámý hráč';
-                    const grp = FIGHT_GROUP_LABEL[f.g] ? `<span class="tj-fgroup">${FIGHT_GROUP_LABEL[f.g]}</span>` : '';
-                    return `<div class="tj-fight ${win ? 'tj-win' : 'tj-loss'}">
-                                ${grp}
-                                <span class="tj-fscore">${Number(f.s)}\u2013${Number(f.os)}</span>
-                                <span class="tj-fopp">${who}</span>
-                                <span class="tj-fres">${win ? 'výhra' : 'prohra'}</span>
-                            </div>`;
-                }).join('') + '</div>';
-            } else if (Array.isArray(h.opponents) && h.opponents.length) {
-                const names = h.opponents.map(id => escapeXml(_nickOf(id) || id)).join(', ');
-                detail = `<div class="tj-fights tj-fights-legacy">Soupeři: ${names}
-                          <div class="tj-legacy-note">U tohoto testu nejsou uložená skóre.</div></div>`;
-            } else {
-                detail = '<div class="tj-fights tj-fights-legacy">Detail soubojů není uložený.</div>';
-            }
-
-            return `<div class="tj-test" data-idx="${idx}">
-                        <button class="tj-test-head" type="button" aria-expanded="false">
-                            <span class="tj-vbadge ${vs.cls}">${vs.icon}</span>
-                            <span class="tj-verdict">${escapeXml(h.note || '')}</span>
-                            <span class="tj-change">${change}</span>
-                            <span class="tj-date">${escapeXml(when)}</span>
-                            <span class="tj-caret">\u203A</span>
-                        </button>
-                        <div class="tj-test-body" hidden>${detail}</div>
-                    </div>`;
-        }).join('');
-
-        container.innerHTML = `<div class="tj-tests-title">Průběh testů (${rows.length})</div>` + html;
-        container.style.display = '';
-
-        container.onclick = (e) => {
-            const head = e.target.closest('.tj-test-head');
-            if (!head) return;
-            const body = head.parentNode.querySelector('.tj-test-body');
-            const open = !body.hidden;
-            body.hidden = open;
-            head.setAttribute('aria-expanded', String(!open));
-            head.parentNode.classList.toggle('tj-open', !open);
+        view.querySelector('.tj-back').onclick = () => {
+            view.innerHTML = ''; view.style.display = 'none';
+            [graph, hint, peak, legend].forEach(el => { if (el) el.style.display = ''; });
         };
     }
 
@@ -1159,10 +1129,18 @@ document.addEventListener('DOMContentLoaded', async function () {
             history
         );
 
-        // Seznam testů se už nevypisuje — detail se otevře kliknutím na tečku v grafu.
-        _openTestIdx = null;
+        // Detail testu se ukáže až po kliknutí na tečku — při otevření vždy graf.
         const testsEl = journeyModal.querySelector('#tier-journey-tests');
         if (testsEl) { testsEl.innerHTML = ''; testsEl.style.display = 'none'; }
+        ['.tier-journey-timeline-wrapper', '.tier-journey-hint', '.tier-journey-legend']
+            .forEach(sel => { const el = journeyModal.querySelector(sel); if (el) el.style.display = ''; });
+
+        // Peak / retire pro tenhle kit — vytáhneme z dat hráče, která už máme.
+        const _jp = journeyModal.querySelector('#tier-journey-peak');
+        const _player = overallData.find(p => p.discordId === discordId)
+                     || allPlayers.find(p => p.discordId === discordId);
+        const _entry = _player && _player.tiers ? _player.tiers.find(t => t.icon === kitIcon) : null;
+        renderJourneyPeak(_jp, _entry);
 
         journeyModal.style.display = 'flex';
     }
