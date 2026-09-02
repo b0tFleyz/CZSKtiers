@@ -23,7 +23,7 @@
   //
   //  Otestovat druhou cestu bez přepínání souboru:
   //      ?data=snapshot   nebo   ?data=xlsx      v URL
-  var DEFAULT_USE_SNAPSHOT = false;
+  var DEFAULT_USE_SNAPSHOT = true;
 
   var USE_SNAPSHOT = (function () {
     try {
