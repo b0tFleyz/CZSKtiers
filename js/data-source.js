@@ -19,8 +19,18 @@
     return prefix + 'data/' + guild + '/' + file;
   }
 
+  // 404 tady NENÍ chyba — na GitHub Pages data od bota prostě nejsou a web
+  // korektně spadne na XLSX. Nechceme kvůli tomu červený error v konzoli.
+  var _missing = {};
   function fetchJson(url) {
     return fetch(url, { cache: 'no-cache' }).then(function (r) {
+      if (r.status === 404) {
+        if (!_missing[url]) {
+          _missing[url] = true;
+          console.info('[data] ' + url + ' není k dispozici — používám XLSX (pomalejší).');
+        }
+        var e = new Error('missing'); e.missing = true; throw e;
+      }
       if (!r.ok) throw new Error(url + ' -> ' + r.status);
       return r.json();
     });
@@ -44,6 +54,13 @@
     return fetchJson(dataUrl(guild, 'history.json')).then(function (d) {
       var iconByKit = kitIconMap(guild);
       var players = d.players || {};
+      // Nicky soupeřů, kteří nejsou v overall.json — bez nich by se u soubojů
+      // zobrazovalo jen "neznámý hráč".
+      if (d.nicks && typeof discordIdToNick !== 'undefined') {
+        Object.keys(d.nicks).forEach(function (id) {
+          if (!discordIdToNick[id]) discordIdToNick[id] = d.nicks[id];
+        });
+      }
       Object.keys(players).forEach(function (did) {
         players[did].forEach(function (e) {
           var icon = iconByKit[e.kit];
@@ -66,7 +83,7 @@
       HISTORY_LOADED[guild] = true;
       return target;
     }).catch(function (err) {
-      console.warn('[data-source] historie nedostupná pro', guild, err.message);
+      if (!err.missing) console.warn('[data-source] historie nedostupná pro', guild, err.message);
       return target;
     });
   }

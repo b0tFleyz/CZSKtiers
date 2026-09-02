@@ -1828,7 +1828,20 @@ nav ul li { flex-shrink: 0; }
 .compare-h2h-more { font-size: 0.74em; color: var(--text-muted); }
 
 /* Průběh testů v Tier Journey */
-.tier-journey-tests { margin-top: 14px; display: flex; flex-direction: column; gap: 5px; }
+.tier-journey-tests { margin-top: 12px; display: flex; flex-direction: column; gap: 5px; }
+/* Detail jednoho testu — rozbalí se po kliknutí na tečku v grafu */
+.tj-single { animation: tjFade 0.18s ease; }
+@keyframes tjFade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.tj-test-head-static { cursor: default; padding: 8px 11px; display: flex; align-items: center; gap: 9px; font-size: 0.79em; }
+.tj-test-head-static:hover { background: none; }
+/* Vybraná tečka v grafu */
+.journey-hit.journey-selected { }
+.journey-hit { outline: none; }
+/* Nápověda pod grafem */
+.tier-journey-hint {
+    text-align: center; font-size: 0.72em; color: var(--text-muted);
+    margin-top: 8px; letter-spacing: 0.2px;
+}
 .tj-tests-title {
     font-size: 0.68em; font-weight: 800; letter-spacing: 0.8px;
     text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px;

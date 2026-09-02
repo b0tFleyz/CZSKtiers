@@ -167,10 +167,72 @@ function loadFullPlayerData() {
             });
             _fullDataLoading = false;
         })
+        // Když snapshot není (typicky GitHub Pages bez dat od bota), MUSÍME
+        // spadnout zpátky na XLSX — jinak zůstane fullPlayerData prázdné a
+        // karta hráče na kit stránce se neotevře vůbec.
+        .catch(() => loadFullPlayerDataFromWorkbook())
         .catch(err => {
             _fullDataLoading = false;
             console.error('Error loading full player data:', err);
         });
+}
+
+function loadFullPlayerDataFromWorkbook() {
+    const _guild = (typeof getActiveGuild === 'function') ? getActiveGuild() : 'czsktiers';
+    const _conf  = (typeof getGuildConf === 'function') ? getGuildConf(_guild) : null;
+
+    return getWorkbook().then(workbook => {
+        const iconByKit = CZSKData.kitIconMap(_guild);
+
+        // TierHistory kvůli peak tierům (na kit stránce se jinak nenačítá)
+        kitPageTierHistory = {};
+        const histTab = _conf ? _conf.tierHistoryTab : 'TierHistory';
+        const histName = workbook.SheetNames.find(n => n === histTab);
+        if (histName) {
+            XLSX.utils.sheet_to_json(workbook.Sheets[histName]).forEach(row => {
+                if (!row.Kit || !row.Tier) return;
+                const did = row['Discord ID'] ? String(row['Discord ID']).trim() : null;
+                if (!did) return;
+                const icon = iconByKit[String(row.Kit).trim()];
+                if (!icon) return;
+                if (!kitPageTierHistory[did]) kitPageTierHistory[did] = {};
+                if (!kitPageTierHistory[did][icon]) kitPageTierHistory[did][icon] = [];
+                kitPageTierHistory[did][icon].push({
+                    tier:    String(row.Tier).trim(),
+                    oldTier: row.OldTier ? String(row.OldTier).trim() : null,
+                    date:    row.Date ? String(row.Date).trim() : null
+                });
+            });
+        }
+
+        const sheetTab = _conf ? _conf.sheetTab : null;
+        const ws = (sheetTab && workbook.Sheets[sheetTab]) || workbook.Sheets[workbook.SheetNames[0]];
+        if (!ws) { _fullDataLoading = false; return; }
+
+        const kitKeys = Object.keys(iconByKit);
+        fullPlayerData = XLSX.utils.sheet_to_json(ws)
+            .filter(row => row.UUID && row.Nick)
+            .map(row => {
+                const discordId = row['Discord ID'] ? String(row['Discord ID']).trim() : '';
+                const tiers = [];
+                let score = 0;
+                kitKeys.forEach(key => {
+                    const val = row[key];
+                    if (!val || val === '-' || val === 'N/A') return;
+                    const num = parseFloat(val);
+                    const peakText = discordId ? getPeakTierTextAC(discordId, iconByKit[key]) : null;
+                    const peakScore = peakText ? (PEAK_TIER_SCORE[peakText] || 0) : 0;
+                    if (!isNaN(num)) score += Math.max(num, peakScore);
+                    tiers.push({
+                        tier: String(val),
+                        icon: iconByKit[key],
+                        peakTierText: (peakScore > num) ? peakText : null
+                    });
+                });
+                return { uuid: row.UUID, nick: row.Nick, discordId, score, tiers };
+            });
+        _fullDataLoading = false;
+    });
 }
 
 function showFullPlayerModal(nick, discordId) {

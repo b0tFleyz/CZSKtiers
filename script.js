@@ -922,6 +922,18 @@ document.addEventListener('DOMContentLoaded', async function () {
         container.style.position = 'relative';
         container.appendChild(tip);
 
+        // Klik na tečku = detail toho konkrétního testu (souboje a skóre)
+        svgEl.querySelectorAll('.journey-hit').forEach(circle => {
+            circle.addEventListener('click', function (e) {
+                e.stopPropagation();
+                const i = parseInt(this.getAttribute('data-i'));
+                const modal = document.getElementById('tier-journey-modal');
+                renderSingleTest(modal && modal.querySelector('#tier-journey-tests'), history[i], i);
+                svgEl.querySelectorAll('.journey-hit').forEach(c => c.classList.remove('journey-selected'));
+                if (_openTestIdx === i) this.classList.add('journey-selected');
+            });
+        });
+
         // Hover handlers
         svgEl.querySelectorAll('.journey-hit').forEach(circle => {
             circle.addEventListener('mouseenter', function () {
@@ -986,6 +998,72 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     function _nickOf(discordId) {
         return discordIdToNick[discordId] || null;
+    }
+
+    // === Detail jednoho testu (po kliknutí na bod v grafu) ==============
+    // Dřív se pod grafem vypisoval celý seznam testů. Teď je skrytý a rozbalí
+    // se jen ten test, na jehož tečku uživatel klikne — graf je tím pádem
+    // hlavní ovládací prvek a modal nekyne do délky.
+    let _openTestIdx = null;
+
+    function renderSingleTest(container, entry, idx) {
+        if (!container) return;
+
+        // Druhé kliknutí na stejnou tečku detail zase zavře.
+        if (_openTestIdx === idx) {
+            _openTestIdx = null;
+            container.innerHTML = '';
+            container.style.display = 'none';
+            return;
+        }
+        _openTestIdx = idx;
+
+        const vs = VERDICT_STYLE[entry.note] || { cls: 'tj-v-same', icon: '\u25CF' };
+        const when = entry.ts ? new Date(entry.ts).toLocaleDateString('cs-CZ')
+                              : (entry.date || '');
+        const tierNow = entry.tier ? getOriginalTierText(resolveTierValue(entry.tier) || '') : '';
+        const tierOld = entry.oldTier ? getOriginalTierText(resolveTierValue(entry.oldTier) || '') : '';
+        const change = (tierOld && tierOld !== '-' && tierOld !== tierNow)
+            ? `${escapeXml(tierOld)} \u2192 <b>${escapeXml(tierNow)}</b>`
+            : `<b>${escapeXml(tierNow || entry.tier || '')}</b>`;
+
+        let detail;
+        if (Array.isArray(entry.fights) && entry.fights.length) {
+            detail = '<div class="tj-fights">' + entry.fights.map(f => {
+                const win  = Number(f.s) > Number(f.os);
+                const nick = _nickOf(f.o);
+                const who  = nick ? escapeXml(nick) : 'neznámý hráč';
+                const grp  = FIGHT_GROUP_LABEL[f.g]
+                    ? `<span class="tj-fgroup">${FIGHT_GROUP_LABEL[f.g]}</span>` : '';
+                return `<div class="tj-fight ${win ? 'tj-win' : 'tj-loss'}">
+                            ${grp}
+                            <span class="tj-fscore">${Number(f.s)}\u2013${Number(f.os)}</span>
+                            <span class="tj-fopp">${who}</span>
+                            <span class="tj-fres">${win ? 'výhra' : 'prohra'}</span>
+                        </div>`;
+            }).join('') + '</div>';
+        } else if (Array.isArray(entry.opponents) && entry.opponents.length) {
+            const names = entry.opponents.map(id => escapeXml(_nickOf(id) || id)).join(', ');
+            detail = `<div class="tj-fights tj-fights-legacy">Soupeři: ${names}
+                      <div class="tj-legacy-note">U tohoto testu nejsou uložená skóre.</div></div>`;
+        } else {
+            detail = `<div class="tj-fights tj-fights-legacy">
+                        Detail soubojů není uložený.
+                        <div class="tj-legacy-note">Starší testy skóre neukládaly.</div>
+                      </div>`;
+        }
+
+        container.innerHTML =
+            `<div class="tj-test tj-open tj-single">
+                 <div class="tj-test-head tj-test-head-static">
+                     <span class="tj-vbadge ${vs.cls}">${vs.icon}</span>
+                     <span class="tj-verdict">${escapeXml(entry.note || '')}</span>
+                     <span class="tj-change">${change}</span>
+                     <span class="tj-date">${escapeXml(when)}</span>
+                 </div>
+                 <div class="tj-test-body">${detail}</div>
+             </div>`;
+        container.style.display = '';
     }
 
     function renderTestList(container, history) {
@@ -1081,7 +1159,10 @@ document.addEventListener('DOMContentLoaded', async function () {
             history
         );
 
-        renderTestList(journeyModal.querySelector('#tier-journey-tests'), history);
+        // Seznam testů se už nevypisuje — detail se otevře kliknutím na tečku v grafu.
+        _openTestIdx = null;
+        const testsEl = journeyModal.querySelector('#tier-journey-tests');
+        if (testsEl) { testsEl.innerHTML = ''; testsEl.style.display = 'none'; }
 
         journeyModal.style.display = 'flex';
     }
