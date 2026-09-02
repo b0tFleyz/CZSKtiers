@@ -12,7 +12,9 @@ function renderKitPage(slug, columnKey) {
 
     // Rychlá cesta: snapshot od bota (~74 KB) místo celého XLSX workbooku.
     // Když chybí, spadne se na původní cestu — stránka se nikdy nerozbije.
-    CZSKData.loadOverall(guild)
+    // Když data-source.js chybí nebo je starší, jdi rovnou na XLSX.
+    const _snapReady = typeof CZSKData !== 'undefined' && typeof CZSKData.loadOverall === 'function';
+    (_snapReady ? CZSKData.loadOverall(guild) : Promise.reject(new Error('data-source nedostupný')))
       .then(snap => {
         players = (snap.players || [])
           .filter(p => p.nick)

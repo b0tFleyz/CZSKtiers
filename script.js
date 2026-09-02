@@ -263,7 +263,21 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Hlavní stránka díky tomu nestahuje celý XLSX workbook (oba servery +
     // obě TierHistory záložky) ani SheetJS — jen ~74 KB JSON. Historie se
     // dotahuje až na vyžádání (viz ensureHistoryLoaded).
+    // Umí tahle verze data-source.js všechno, co po ní chceme?
+    // Web a data-source.js se nasazují zvlášť, takže se verze můžou rozejít —
+    // a jeden chybějící pomocník nesmí znamenat rozbitou stránku.
+    function snapshotApiReady() {
+        return typeof CZSKData !== 'undefined'
+            && typeof CZSKData.loadOverall === 'function'
+            && typeof CZSKData.toOverallData === 'function';
+    }
+
     async function nactiOverallSnapshot() {
+        if (!snapshotApiReady()) {
+            const e = new Error('data-source.js je starší verze nebo chybí');
+            e.missing = true;
+            throw e;
+        }
         const snap = await CZSKData.loadOverall(_guild);
         overallData = CZSKData.toOverallData(snap, _guild);
         overallData.forEach(p => {
@@ -277,6 +291,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     let _historyPromise = null;
     async function ensureHistoryLoaded() {
         if (_usingSnapshot === false) return;              // XLSX cesta ji má už v paměti
+        if (typeof CZSKData === 'undefined'
+            || typeof CZSKData.hydrateHistory !== 'function'
+            || typeof CZSKData.isHistoryLoaded !== 'function') return;
         if (CZSKData.isHistoryLoaded(_guild)) return;
         if (!_historyPromise) {
             const other = _guild === 'subtiers' ? 'czsktiers' : 'subtiers';
@@ -301,9 +318,12 @@ document.addEventListener('DOMContentLoaded', async function () {
         } catch (snapErr) {
             // Snapshot ještě neexistuje (bot neběžel) — spadni na starou cestu,
             // ať se stránka nikdy nerozbije kvůli chybějícím datům.
-            console.info(CZSKData.usingSnapshot()
-                ? '[data] snapshot nedostupný, načítám XLSX: ' + snapErr.message
-                : '[data] zdroj: XLSX (snapshot vypnutý v js/data-source.js)');
+            const _snapOn = (typeof CZSKData !== 'undefined'
+                && typeof CZSKData.usingSnapshot === 'function')
+                ? CZSKData.usingSnapshot() : null;
+            console.info(_snapOn === false
+                ? '[data] zdroj: XLSX (snapshot vypnutý v js/data-source.js)'
+                : '[data] snapshot nedostupný, načítám XLSX: ' + snapErr.message);
             _usingSnapshot = false;
             await nactiOverallExcel();
         }

@@ -141,7 +141,10 @@ function loadFullPlayerData() {
     // Snapshot od bota misto celeho XLSX workbooku. Kity se berou z GUILD_CONFIG,
     // takze uz nemuzou chybet nove pridane kity (drive tu byl natvrdo zapsany
     // seznam, kteremu chybel Trident, Manhunt, Elytra, Bow, Bed i Debuff).
-    CZSKData.loadOverall(_guild)
+    const _snapReady = typeof CZSKData !== 'undefined'
+        && typeof CZSKData.loadOverall === 'function'
+        && typeof CZSKData.kitIconMap === 'function';
+    (_snapReady ? CZSKData.loadOverall(_guild) : Promise.reject(new Error('data-source nedostupný')))
         .then(snap => {
             const iconByKit = CZSKData.kitIconMap(_guild);
             kitPageTierHistory = {};   // historie se na tehle strance nepotrebuje
@@ -182,7 +185,15 @@ function loadFullPlayerDataFromWorkbook() {
     const _conf  = (typeof getGuildConf === 'function') ? getGuildConf(_guild) : null;
 
     return getWorkbook().then(workbook => {
-        const iconByKit = CZSKData.kitIconMap(_guild);
+        // kitIconMap je z data-source.js; když chybí, poskládej ji z GUILD_CONFIG
+        const iconByKit = (typeof CZSKData !== 'undefined' && typeof CZSKData.kitIconMap === 'function')
+            ? CZSKData.kitIconMap(_guild)
+            : (function () {
+                const m = {};
+                const c = (typeof getGuildConf === 'function') ? getGuildConf(_guild) : null;
+                ((c && c.kits) || []).forEach(k => { m[k.key] = 'kit_icons/' + k.icon; });
+                return m;
+              })();
 
         // TierHistory kvůli peak tierům (na kit stránce se jinak nenačítá)
         kitPageTierHistory = {};
