@@ -1804,28 +1804,78 @@ nav ul li { flex-shrink: 0; }
     opacity: 0.75;
 }
 
-/* Vzájemná bilance */
+/* Vzájemná bilance
+   Dřív to byla řádka drobných pilulek — při víc soubojích se to slilo a nešlo
+   poznat, kdo zápas vyhrál. Teď je to seznam řádků: kit, skóre obarvené podle
+   vítěze, jméno vítěze a datum. */
 .compare-h2h {
-    width: 100%; margin-top: 4px; padding-top: 9px;
+    width: 100%; margin-top: 6px; padding-top: 12px;
     border-top: 1px solid var(--border-subtle);
-    display: flex; flex-direction: column; gap: 6px; align-items: center;
+    display: flex; flex-direction: column; gap: 9px;
 }
-.compare-h2h-empty { font-size: 0.84em; color: var(--text-muted); text-align: center; }
-.compare-h2h-title { font-size: 0.88em; color: var(--text-secondary); text-align: center; }
-.compare-h2h-title b { color: var(--text-primary); }
-.compare-h2h-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.compare-h2h-empty {
+    font-size: 0.84em; color: var(--text-muted); text-align: center;
+    padding: 10px 0;
+}
+
+.compare-h2h-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+}
+.compare-h2h-label {
+    font-size: 0.78em; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text-muted); font-weight: 700;
+}
+.compare-h2h-tally {
+    display: inline-flex; align-items: baseline; gap: 4px;
+    font-size: 1.05em; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.compare-h2h-tally i, .compare-h2h-score i {
+    font-style: normal; color: var(--text-muted); font-weight: 600;
+}
+.compare-h2h-tally em {
+    font-style: normal; font-size: 0.62em; font-weight: 600;
+    color: var(--text-muted); margin-left: 5px;
+}
+/* Levý hráč zeleně, pravý červeně — stejné pořadí jako karty nahoře. */
+.h2h-sa { color: #4ade80; }
+.h2h-sb { color: #f87171; }
+
+/* Poměr výher na první pohled */
+.compare-h2h-bar {
+    height: 5px; border-radius: 3px; overflow: hidden;
+    background: rgba(248,113,113,0.55);
+}
+.compare-h2h-bar-a { display: block; height: 100%; background: #4ade80; }
+
+.compare-h2h-list { display: flex; flex-direction: column; gap: 4px; }
 .compare-h2h-row {
-    display: inline-flex; align-items: center; gap: 6px;
+    display: grid;
+    grid-template-columns: 18px minmax(62px, auto) 1fr auto;
+    align-items: center; gap: 10px;
     background: var(--bg-card); border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-pill); padding: 3px 10px 3px 5px;
-    font-size: 0.76em;
+    border-left-width: 3px;
+    border-radius: var(--radius-sm); padding: 6px 10px;
+    font-size: 0.8em;
 }
-.compare-h2h-row.h2h-a { border-color: rgba(74,222,128,0.35); }
-.compare-h2h-row.h2h-b { border-color: rgba(248,113,113,0.35); }
-.compare-h2h-kit { width: 15px; height: 15px; object-fit: contain; }
-.compare-h2h-score { font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.compare-h2h-date { color: var(--text-muted); }
-.compare-h2h-more { font-size: 0.74em; color: var(--text-muted); }
+.compare-h2h-row.h2h-a { border-left-color: #4ade80; }
+.compare-h2h-row.h2h-b { border-left-color: #f87171; }
+.compare-h2h-row.h2h-d { border-left-color: var(--text-muted); }
+.compare-h2h-kit { width: 18px; height: 18px; object-fit: contain; }
+.compare-h2h-score {
+    font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.compare-h2h-winner {
+    color: var(--text-secondary); font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.compare-h2h-date { color: var(--text-muted); font-size: 0.9em; white-space: nowrap; }
+.compare-h2h-more { font-size: 0.76em; color: var(--text-muted); text-align: center; }
+
+@media (max-width: 520px) {
+    /* Na úzkém displeji je jméno vítěze to první, co se dá obětovat. */
+    .compare-h2h-row { grid-template-columns: 18px auto 1fr; gap: 8px; }
+    .compare-h2h-winner { display: none; }
+}
 
 /* Peak / retire pruh nahoře v Tier Journey (pod hlavičkou, nad grafem) */
 .tier-journey-peak {

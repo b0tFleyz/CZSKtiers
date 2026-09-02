@@ -4,6 +4,29 @@ let fullPlayerData = []; // Plná data pro modal
 let kitPageTierHistory = {}; // discordId → kitIcon → [{tier, oldTier}]
 let _fullDataLoading = false;
 
+// Tier Journey je sdílený s hlavní stránkou (js/tier-journey-view.js). Dřív měly
+// kit stránky vlastní kopii (js/tierjourney.js), která zaostala — datum ukazovala
+// jako holé číslo, neuměla detail soubojů ani peak pruh a historii si tahala
+// z XLSX i tehdy, když zbytek webu už četl snapshot. Tady se sdílené verzi jen
+// řekne, kde na téhle stránce leží data.
+if (typeof CZSKJourney !== 'undefined') {
+    CZSKJourney.configure({
+        getHistory: function (discordId, kitIcon) {
+            return (discordId && kitPageTierHistory[discordId] && kitPageTierHistory[discordId][kitIcon]) || [];
+        },
+        getTierEntry: function (discordId, kitIcon) {
+            var p = (fullPlayerData || []).find(function (x) { return x.discordId === discordId; })
+                 || (allPlayers || []).find(function (x) { return x.discordId === discordId; });
+            return p && p.tiers ? p.tiers.find(function (t) { return t.icon === kitIcon; }) : null;
+        },
+        nickOf: function (discordId) {
+            var p = (fullPlayerData || []).find(function (x) { return x.discordId === discordId; })
+                 || (allPlayers || []).find(function (x) { return x.discordId === discordId; });
+            return (p && p.nick) || (typeof discordIdToNick !== 'undefined' ? discordIdToNick[discordId] : null) || null;
+        }
+    });
+}
+
 function _escHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
