@@ -2074,10 +2074,23 @@ document.addEventListener('DOMContentLoaded', async function () {
         const peakVal = peakText ? parseInt(PEAK_TIER_SCORE[peakText] || 0) : 0;
         if (!t && !peakVal) return null;
         const useValue = Math.max(isNaN(curVal) ? 0 : curVal, peakVal);
+        const fromPeak = peakVal > (isNaN(curVal) ? 0 : curVal);
+
+        // POZOR: `value` a `display` nejsou totéž.
+        //   value   = body (peak HT3 = 14) — podle nich se rozhoduje, kdo kit vyhrál
+        //   display = hodnota, kterou znají tierInfo()/getOriginalTierText(), tedy
+        //             skutečná bodová hodnota TIERU (HT3 = 16)
+        // U ostatních peaků to vychází nastejno, protože jejich body jsou body
+        // R-tieru (RLT2 = 22 …) a ty tabulka zná. HT3 ale žádný R-tier nemá,
+        // takže se v odznaku porovnání ukazovalo holé "14" místo "HT3".
+        const display = fromPeak
+            ? (resolveTierValue(peakText) || String(useValue))
+            : String(useValue);
+
         return {
             value: useValue,
-            display: String(useValue),
-            fromPeak: peakVal > (isNaN(curVal) ? 0 : curVal),
+            display: display,
+            fromPeak: fromPeak,
             peakText: peakText,
             canRetire: !!(t && t.canRetire),
             pending: t ? t.pending : null

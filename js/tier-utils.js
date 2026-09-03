@@ -18,14 +18,21 @@
 //  peak počítá bot ze svých hodin a tenhle odhad zmizí.
 var USE_DERIVED_PEAK = true;
 const TIER_ORDER = ["60","48","32","24","16","10","5","3","2","1","54","43","29","22"];
-// Skóre "retired" varianty tieru. HT3 tu dřív mělo 14 — hodnotu, která v TIER_ORDER
-// vůbec není, takže getTierOrder('14') vracelo 999 a HT3 peak padal na konec seřazení.
-// Retire z HT3 stejně není možný (bot: RETIREABLE_TIERS), takže tu HT3 nemá co dělat.
-// Body za ZAMCENY peak. Jsou to hodnoty R-tieru (RLT2=22, RHT2=29, ...), tedy
-// o ~9 % min nez zivy tier — peak je kredit za to, co si hrac odsloužil.
-// HT3 zadny R-tier nema (retire z nej neni), ale peak se za nej ziska po 30
-// dnech uplne stejne — driv tu chybel, takze hrac s peakem HT3 nedostal nic
-// a spadl na body sveho aktualniho tieru. 16 (zivy HT3) minus stejna srazka.
+// Body za ZAMCENY peak tier. U tieru, ze kterych jde jit do retiru, jsou to
+// body prislusneho R-tieru (RLT2 = 22, RHT2 = 29, RLT1 = 43, RHT1 = 54), tedy
+// o ~9 % min nez zivy tier — peak je kredit za to, co si hrac odslouzil.
+//
+// HT3 = 14. Retire z HT3 neni (bot: RETIREABLE_TIERS), takze RHT3 neexistuje
+// a neni odkud vzit "oficialni" cislo; 14 je stejna ~9% srazka z 16 jako u
+// ostatnich. Peak HT3 se ziskava po 30 dnech na tieru uplne stejne jako zbytek.
+//
+// POZOR: tyhle hodnoty jsou BODY, ne bodove hodnoty tieru. 14 zadnemu tieru
+// neodpovida, takze se nesmi poslat do tierInfo() ani getOriginalTierText() —
+// odznak by misto "HT3" ukazal hole "14". Kdyz potrebujes nazev nebo barvu,
+// prevedes NAZEV peaku pres resolveTierValue() (HT3 -> 16); viz
+// getEffectiveTierForKit() ve script.js, kde je `value` (body) a `display`
+// (hodnota tieru) zamerne rozdelene. Do getTierOrder() se sem nic nedostane —
+// ten dostava vzdy syrovy tier z tabulky.
 // MUSI sedet s PEAK_TIER_SCORE v bot/publish-snapshot.js.
 const PEAK_TIER_SCORE = { 'HT3': 14, 'LT2': 22, 'HT2': 29, 'LT1': 43, 'HT1': 54 };
 

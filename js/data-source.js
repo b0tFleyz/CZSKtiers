@@ -13,13 +13,16 @@
   // =====================================================================
   //  PŘEPÍNAČ ZDROJE DAT  — tohle je jediný řádek, který se mění
   // =====================================================================
-  //  false = ber data z XLSX (Google Sheets)   ← teď
-  //  true  = ber data ze snapshotu od bota     ← až bude historie kompletní
+  //  false = ber data z XLSX (Google Sheets)
+  //  true  = ber data ze snapshotu od bota     ← teď
   //
-  //  Proč zatím XLSX: bot má v tierHistory.json historii jen pro ~68 %
-  //  hráčů (to, co sám zapsal). List TierHistory v tabulce je bohatší,
-  //  protože do něj napadaly i starší výsledky. Než se doplní
-  //  (import-sheet-history.js + backfill-fights.js), je XLSX úplnější.
+  //  Historie uz je kompletni (bootstrap: sheets + topresults + backfill),
+  //  takze snapshot je bohatsi i rychlejsi nez XLSX.
+  //
+  //  POZOR: fallback na XLSX se pouzije, kdyz data/<guild>/*.json vrati 404.
+  //  Dokud web bezi na GitHub Pages, kam bot snapshoty NEZAPISUJE, spadne na
+  //  XLSX uplne vzdy — tj. kazdy navstevnik stahuje cely workbook z Google.
+  //  Zmizi to az bude web servirovat bot ze sve WEB_ROOT (notes/06-domain-setup.md).
   //
   //  Otestovat druhou cestu bez přepínání souboru:
   //      ?data=snapshot   nebo   ?data=xlsx      v URL
