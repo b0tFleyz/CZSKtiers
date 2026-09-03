@@ -21,7 +21,13 @@ const TIER_ORDER = ["60","48","32","24","16","10","5","3","2","1","54","43","29"
 // Skóre "retired" varianty tieru. HT3 tu dřív mělo 14 — hodnotu, která v TIER_ORDER
 // vůbec není, takže getTierOrder('14') vracelo 999 a HT3 peak padal na konec seřazení.
 // Retire z HT3 stejně není možný (bot: RETIREABLE_TIERS), takže tu HT3 nemá co dělat.
-const PEAK_TIER_SCORE = { 'LT2': 22, 'HT2': 29, 'LT1': 43, 'HT1': 54 };
+// Body za ZAMCENY peak. Jsou to hodnoty R-tieru (RLT2=22, RHT2=29, ...), tedy
+// o ~9 % min nez zivy tier — peak je kredit za to, co si hrac odsloužil.
+// HT3 zadny R-tier nema (retire z nej neni), ale peak se za nej ziska po 30
+// dnech uplne stejne — driv tu chybel, takze hrac s peakem HT3 nedostal nic
+// a spadl na body sveho aktualniho tieru. 16 (zivy HT3) minus stejna srazka.
+// MUSI sedet s PEAK_TIER_SCORE v bot/publish-snapshot.js.
+const PEAK_TIER_SCORE = { 'HT3': 14, 'LT2': 22, 'HT2': 29, 'LT1': 43, 'HT1': 54 };
 
 function getTierOrder(tier) {
     const idx = TIER_ORDER.indexOf(String(tier));
